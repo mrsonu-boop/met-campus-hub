@@ -1,103 +1,433 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { motion } from "framer-motion";
+import {
+  BookMarked,
+  CheckCircle2,
+  GraduationCap,
+  PackageCheck,
+  ShoppingBag,
+  Sparkles,
+  X,
+} from "lucide-react";
+
+import { AiDrawer } from "@/components/AiDrawer";
+import { AuthModal, type AuthTab } from "@/components/AuthModal";
+import { AuthProvider, useAuth } from "@/components/AuthProvider";
+import { CampusExchange } from "@/components/CampusExchange";
+import { ContactModal } from "@/components/ContactModal";
+import { GearExchange } from "@/components/GearExchange";
+import { Header } from "@/components/Header";
+import { KnowledgeVault } from "@/components/KnowledgeVault";
+import { ListResourceModal } from "@/components/ListResourceModal";
+
+import { NOTE_SETS, SEED_LISTINGS, SEED_TRANSACTIONS } from "@/lib/data";
+import {
+  isSupabaseConfigured,
+  listingToRow,
+  rowToListing,
+  supabase,
+  type ListingsRow,
+} from "@/lib/supabase";
+import type {
+  Branch,
+  ExchangeTransaction,
+  GearCategory,
+  GearListing,
+  ListingType,
+  NoteSet,
+  NoteUnit,
+  TabId,
+  Year,
+} from "@/lib/types";
+
+const TABS: Array<{ id: TabId; label: string; short: string; icon: typeof ShoppingBag }> = [
+  { id: "gear", label: "Gear Exchange", short: "Gear", icon: ShoppingBag },
+  { id: "vault", label: "Knowledge Vault & AI Assistant", short: "Vault", icon: BookMarked },
+  { id: "exchange", label: "Verified Exchange & QR Handoff", short: "Handoff", icon: PackageCheck },
+];
+
+const TAB_HINTS: Record<TabId, string> = {
+  gear:
+    "Rent, sell or donate within campus. Meet only at verified IOE spots and confirm handoffs in the Verified Exchange tab.",
+  vault:
+    "Unit-wise SPPU notes, faculty-verified. Download the PDF or open the AI drawer to ask about any single unit.",
+  exchange:
+    "Scan the QR at the meetup spot, read out the 4-digit PIN, and escrow is released to the seller.",
+};
+
+interface AiContext {
+  noteSet: NoteSet;
+  unit: NoteUnit | null;
+}
+
+export default function CampusHubPage() {
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <AuthProvider>
+      <CampusHub />
+    </AuthProvider>
+  );
+}
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+function CampusHub() {
+  const { isAuthenticated, user } = useAuth();
+  const [activeTab, setActiveTab] = useState<TabId>("gear");
+
+  // Global filters — shared by every tab.
+  const [search, setSearch] = useState("");
+  const [branch, setBranch] = useState<Branch | "All">("All");
+  const [year, setYear] = useState<Year | "All">("All");
+
+  // Tab-local filters.
+  const [category, setCategory] = useState<GearCategory | "All Items">("All Items");
+  const [typeFilter, setTypeFilter] = useState<ListingType | "All">("All");
+
+  // Collections.
+  const [listings, setListings] = useState<GearListing[]>(SEED_LISTINGS);
+  const [transactions, setTransactions] = useState<ExchangeTransaction[]>(SEED_TRANSACTIONS);
+  const [activeTxnId, setActiveTxnId] = useState<string | null>(SEED_TRANSACTIONS[0].id);
+
+  // Overlays.
+  const [contactListing, setContactListing] = useState<GearListing | null>(null);
+  const [listModalOpen, setListModalOpen] = useState(false);
+  const [aiContext, setAiContext] = useState<AiContext | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authIntent, setAuthIntent] = useState<string | null>(null);
+  const [authTab, setAuthTab] = useState<AuthTab>("signin");
+
+  const toastTimer = useRef<number | null>(null);
+
+  /* ── Cloud sync ────────────────────────────────────────────────
+   * Pull the shared exchange from Supabase on load. An empty table (or no
+   * Supabase config at all) falls back to the bundled seed so the page is
+   * never empty. */
+  useEffect(() => {
+    if (!supabase) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const { data, error } = await supabase.from("listings").select("*");
+        if (cancelled || error || !data || data.length === 0) return;
+        setListings((data as ListingsRow[]).map(rowToListing));
+      } catch {
+        // Network hiccup — the seed data already on screen stays in play.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /** Mirrors a new listing to the cloud so other devices pick it up. */
+  const persistListing = useCallback(async (listing: GearListing) => {
+    if (!supabase) return;
+    try {
+      const { error } = await supabase.from("listings").insert(listingToRow(listing));
+      if (error) console.error("Supabase listing insert failed:", error.message);
+    } catch (error) {
+      console.error("Supabase listing insert failed:", error);
+    }
+  }, []);
+
+  const showToast = useCallback((message: string) => {
+    setToast(message);
+    if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(null), 3600);
+  }, []);
+
+  /**
+   * Protected actions (list a resource, contact a seller) route through here so
+   * a signed-out visitor always lands on the auth dialog with the reason
+   * explained, instead of silently doing nothing.
+   */
+  const requireAuth = useCallback(
+    (intent: string, run: () => void) => {
+      if (isAuthenticated) {
+        run();
+        return;
+      }
+      setAuthIntent(intent);
+      setAuthTab("signin");
+      setAuthOpen(true);
+    },
+    [isAuthenticated],
+  );
+
+  const query = search.trim().toLowerCase();
+
+  /* ── Gear Exchange ─────────────────────────────────────────────── */
+  const filteredListings = useMemo(() => {
+    return listings.filter((listing) => {
+      if (branch !== "All" && listing.branch !== branch) return false;
+      if (year !== "All" && listing.year !== year) return false;
+      if (category !== "All Items" && listing.category !== category) return false;
+      if (typeFilter !== "All" && listing.listingType !== typeFilter) return false;
+      if (query) {
+        const haystack = [
+          listing.title,
+          listing.subtitle,
+          listing.seller,
+          listing.spot,
+          listing.category,
+          listing.branch,
+          listing.year,
+        ]
+          .join(" ")
+          .toLowerCase();
+        if (!haystack.includes(query)) return false;
+      }
+      return true;
+    });
+  }, [branch, category, listings, query, typeFilter, year]);
+
+  /* ── Knowledge Vault ───────────────────────────────────────────── */
+  const filteredNoteSets = useMemo(() => {
+    return NOTE_SETS.filter((noteSet) => {
+      if (branch !== "All" && noteSet.branch !== branch) return false;
+      if (year !== "All" && noteSet.semester !== year) return false;
+      if (query) {
+        const haystack = [
+          noteSet.subject,
+          noteSet.courseCode,
+          noteSet.description,
+          noteSet.units.map((unit) => `${unit.unit} ${unit.topics.join(" ")}`).join(" "),
+        ]
+          .join(" ")
+          .toLowerCase();
+        if (!haystack.includes(query)) return false;
+      }
+      return true;
+    });
+  }, [branch, query, year]);
+
+  /* ── Handoff tracker ───────────────────────────────────────────── */
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter((txn) => {
+      if (branch !== "All" && txn.branch !== branch) return false;
+      if (year !== "All" && txn.year !== year) return false;
+      if (query && !`${txn.item} ${txn.counterparty} ${txn.meetSpot}`.toLowerCase().includes(query)) {
+        return false;
+      }
+      return true;
+    });
+  }, [branch, query, transactions, year]);
+
+  const resetFilters = useCallback(() => {
+    setCategory("All Items");
+    setTypeFilter("All");
+  }, []);
+
+  const handleNewListing = useCallback(
+    (listing: GearListing) => {
+      // Optimistic: show it immediately, sync in the background.
+      setListings((prev) => [listing, ...prev]);
+      setActiveTab("gear");
+      setCategory("All Items");
+      setTypeFilter("All");
+      void persistListing(listing);
+      showToast(`"${listing.title}" is live on the Gear Exchange.`);
+    },
+    [persistListing, showToast],
+  );
+
+  const handleStatusChange = useCallback(
+    (id: string, status: ExchangeTransaction["status"]) => {
+      setTransactions((prev) => prev.map((txn) => (txn.id === id ? { ...txn, status } : txn)));
+      showToast(
+        status === "verified"
+          ? "Handoff verified — escrow released to the seller."
+          : "Transaction reopened and moved back to the active queue.",
+      );
+    },
+    [showToast],
+  );
+
+  const counts: Record<TabId, number> = {
+    gear: filteredListings.length,
+    vault: filteredNoteSets.length,
+    exchange: filteredTransactions.length,
+  };
+
+  return (
+    <>
+      <Header
+        search={search}
+        onSearchChange={setSearch}
+        branch={branch}
+        onBranchChange={setBranch}
+        year={year}
+        onYearChange={setYear}
+        onListResource={() =>
+          requireAuth("Sign in to publish a resource to the campus exchange.", () =>
+            setListModalOpen(true),
+          )
+        }
+        onFocusSearch={() => setSearch((prev) => prev)}
+        cloudSync={isSupabaseConfigured()}
+        onSignIn={() => {
+          setAuthIntent(null);
+          setAuthTab("signin");
+          setAuthOpen(true);
+        }}
+      />
+
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        {/* Segmented control */}
+        <div className="mb-5 flex flex-col gap-3">
+          <div
+            role="tablist"
+            aria-label="Campus Hub sections"
+            className="scroll-thin -mx-1 flex gap-1 overflow-x-auto rounded-xl border border-line bg-elevated/60 p-1"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            {TABS.map((tab) => {
+              const active = activeTab === tab.id;
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  role="tab"
+                  type="button"
+                  aria-selected={active}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
+                    active ? "text-fg" : "text-muted hover:text-fg"
+                  }`}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId="hub-tab-pill"
+                      transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                      className="absolute inset-0 rounded-lg border border-line bg-surface shadow-sm"
+                    />
+                  )}
+                  <Icon className={`relative z-10 h-4 w-4 ${active ? "text-brand" : ""}`} />
+                  <span className="relative z-10 hidden sm:inline">{tab.label}</span>
+                  <span className="relative z-10 sm:hidden">{tab.short}</span>
+                  <span
+                    className={`relative z-10 rounded px-1.5 py-0.5 font-mono text-[10px] ${
+                      active
+                        ? "bg-brand/12 text-brand"
+                        : "bg-surface text-faint"
+                    }`}
+                  >
+                    {counts[tab.id]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <p className="flex items-start gap-2 text-xs leading-relaxed text-muted">
+            <Sparkles className="mt-0.5 h-3 w-3 shrink-0 text-brand" />
+            {TAB_HINTS[activeTab]}
+          </p>
         </div>
+
+        {/* Active tab content */}
+        {activeTab === "gear" && (
+          <GearExchange
+            listings={filteredListings}
+            category={category}
+            onCategoryChange={setCategory}
+            typeFilter={typeFilter}
+            onTypeFilterChange={setTypeFilter}
+            onContact={(listing) =>
+              requireAuth("Sign in so the seller knows who is messaging them.", () =>
+                setContactListing(listing),
+              )
+            }
+            search={search}
+            branchFiltered={branch !== "All"}
+            yearFiltered={year !== "All"}
+            onResetFilters={resetFilters}
+          />
+        )}
+
+        {activeTab === "vault" && (
+          <KnowledgeVault
+            noteSets={filteredNoteSets}
+            onAskAi={(noteSet, unit) => setAiContext({ noteSet, unit })}
+          />
+        )}
+
+        {activeTab === "exchange" && (
+          <CampusExchange
+            transactions={filteredTransactions}
+            activeId={activeTxnId}
+            onSelect={setActiveTxnId}
+            onStatusChange={handleStatusChange}
+          />
+        )}
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+
+      {/* Footer */}
+      <footer className="border-t border-line bg-surface/50">
+        <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-3 px-4 py-6 text-xs text-faint sm:flex-row sm:items-center sm:px-6 lg:px-8">
+          <p className="inline-flex items-center gap-1.5">
+            <GraduationCap className="h-3.5 w-3.5" />
+            MET Campus Hub — a student-run exchange for MET BKC IOE, SPPU curriculum.
+          </p>
+          <p className="font-mono">
+            Handoffs protected by QR + PIN escrow · Built with Next.js 15
+          </p>
+        </div>
       </footer>
-    </div>
+
+      {/* Toast */}
+      {toast && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-5 z-[60] flex justify-center px-4">
+          <div className="card pointer-events-auto flex max-w-md animate-fade-up items-start gap-2.5 px-4 py-3 glow-emerald">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+            <p className="text-sm text-fg">{toast}</p>
+            <button
+              type="button"
+              onClick={() => setToast(null)}
+              aria-label="Dismiss"
+              className="-mr-1 shrink-0 rounded p-0.5 text-muted transition hover:text-fg"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Overlays */}
+      <ContactModal listing={contactListing} onClose={() => setContactListing(null)} />
+
+      <ListResourceModal
+        open={listModalOpen}
+        onClose={() => setListModalOpen(false)}
+        onSubmit={handleNewListing}
+      />
+
+      <AuthModal
+        open={authOpen}
+        intent={authIntent}
+        initialTab={authTab}
+        onClose={() => {
+          setAuthOpen(false);
+          setAuthIntent(null);
+        }}
+      />
+
+      {aiContext && (
+        <AiDrawer
+          noteSet={aiContext.noteSet}
+          unit={aiContext.unit}
+          onClose={() => setAiContext(null)}
+        />
+      )}
+
+      {/* Screen-reader announcement of the active identity. */}
+      <p className="sr-only" aria-live="polite">
+        {user ? `Signed in as ${user.name}, ${user.year} ${user.department}.` : "Signed out."}
+      </p>
+    </>
   );
 }
