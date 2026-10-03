@@ -103,15 +103,6 @@ export const DEMO_USERS: StoredUser[] = [
   },
 ];
 
-export const DEFAULT_STUDENT: Student = {
-  id: DEMO_USERS[0].id,
-  name: DEMO_USERS[0].name,
-  email: DEMO_USERS[0].email,
-  department: DEMO_USERS[0].department,
-  year: DEMO_USERS[0].year,
-  prn: DEMO_USERS[0].prn,
-};
-
 /** Projects a credential record down to the session shape (drops the secret). */
 function toSession(user: StoredUser): Student {
   return {
@@ -236,21 +227,20 @@ function initials(name: string): string {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<Student | null>(DEFAULT_STUDENT);
+  // Visitors start signed out. A session only exists once it is written by
+  // `signIn`/`register`, so the first paint never shows a fake identity.
+  const [user, setUser] = useState<Student | null>(null);
 
   useEffect(() => {
     const store = ls();
     if (!store) return;
 
+    // Seeds the two demo credential records only — no session is created, so
+    // the absence of `active_student_session` always means "signed out".
     ensureSeededUsers();
 
-    // The demo session is installed exactly once. Afterwards the absence of
-    // `active_student_session` genuinely means "signed out".
     if (!readJson<string>(SEEDED_KEY)) {
       writeJson(SEEDED_KEY, new Date().toISOString());
-      if (readJson<Student>(SESSION_KEY) === undefined) {
-        writeJson(SESSION_KEY, DEFAULT_STUDENT);
-      }
       return;
     }
 
