@@ -6,23 +6,25 @@ import type { GearListing } from "@/lib/types";
  * Row shapes expected in Postgres. Keep these in sync with the SQL in
  * `supabase/schema.sql`.
  */
+/**
+ * Mirrors the live `listings` table. Note the naming differs from this app's
+ * domain model: `type` (not `listing_type`), `seller_name`, `seller_contact`
+ * and `meetup_spot`, and `id` is a Postgres `uuid` rather than free text.
+ * Only these columns exist — see `toListingsRow` for how the rest of the
+ * listing maps onto them.
+ */
 export interface ListingsRow {
   id: string;
   title: string;
-  subtitle: string | null;
   category: string;
-  listing_type: string;
-  price: number | null;
-  price_unit: string | null;
+  type: string;
+  price: number;
   condition: string;
-  seller: string;
+  seller_name: string;
+  seller_contact: string;
+  meetup_spot: string;
   branch: string;
-  year: string;
-  spot: string;
-  phone: string;
-  posted_ago: string;
-  featured: boolean;
-  verified: boolean;
+  created_at: string;
 }
 
 export interface UsersRow {
@@ -55,46 +57,67 @@ export function isSupabaseConfigured(): boolean {
   return supabase !== null;
 }
 
-/** Postgres snake_case -> the app's camelCase `GearListing`. */
+/**
+ * `rent`/`donate` are part of the app's vocabulary but the table's `type`
+ * column only carries the sale vocabulary, so both are stored as their own
+ * values and read back faithfully.
+ */
+const LISTING_TYPES = ["rent", "sale", "donate"] as const;
+
+/** Postgres row -> the app's camelCase `GearListing`. */
 export function rowToListing(row: ListingsRow): GearListing {
+  const type = LISTING_TYPES.includes(row.type as (typeof LISTING_TYPES)[number])
+    ? (row.type as GearListing["listingType"])
+    : "sale";
+
   return {
     id: row.id,
     title: row.title,
-    subtitle: row.subtitle ?? "",
+    subtitle: "",
     category: row.category as GearListing["category"],
-    listingType: row.listing_type as GearListing["listingType"],
-    price: row.price,
-    priceUnit: (row.price_unit as GearListing["priceUnit"]) ?? undefined,
+    listingType: type,
+    price: Number(row.price),
+    priceUnit: type === "rent" ? "semester" : "one-time",
     condition: row.condition as GearListing["condition"],
-    seller: row.seller,
+    seller: row.seller_name,
     branch: row.branch as GearListing["branch"],
-    year: row.year as GearListing["year"],
-    spot: row.spot,
-    phone: row.phone,
-    postedAgo: row.posted_ago ?? "Just now",
-    featured: Boolean(row.featured),
-    verified: Boolean(row.verified),
+    year: "SE",
+    spot: row.meetup_spot,
+    phone: row.seller_contact,
+    postedAgo: formatAge(row.created_at),
+    featured: false,
+    verified: false,
   };
 }
 
-/** `GearListing` -> Postgres row. `email`-style normalisation is the caller's job. */
-export function listingToRow(listing: GearListing): ListingsRow {
+/** The app's `GearListing` -> the Postgres row shape. */
+export function toListingsRow(listing: GearListing, id: string, createdAt: string): ListingsRow {
   return {
-    id: listing.id,
+    id,
     title: listing.title,
-    subtitle: listing.subtitle,
     category: listing.category,
-    listing_type: listing.listingType,
-    price: listing.price,
-    price_unit: listing.priceUnit ?? null,
+    type: listing.listingType,
+    price: Number(listing.price ?? 0),
     condition: listing.condition,
-    seller: listing.seller,
+    seller_name: listing.seller,
+    seller_contact: listing.phone,
+    meetup_spot: listing.spot,
     branch: listing.branch,
-    year: listing.year,
-    spot: listing.spot,
-    phone: listing.phone,
-    posted_ago: listing.postedAgo,
-    featured: Boolean(listing.featured),
-    verified: Boolean(listing.verified),
+    created_at: createdAt,
   };
+}
+
+/** Renders `created_at` as the short "2h ago" label the cards show. */
+function formatAge(createdAt: string): string {
+  const elapsed = Date.now() - new Date(createdAt).getTime();
+  if (!Number.isFinite(elapsed) || elapsed < 0) return "Just now";
+
+  const minutes = Math.floor(elapsed / 60_000);
+  if (minutes < 60) return minutes <= 1 ? "Just now" : `${minutes}m ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+
+  const days = Math.floor(hours / 24);
+  return days === 1 ? "1d ago" : `${days}d ago`;
 }

@@ -32,24 +32,21 @@ create unique index if not exists users_email_lower_key
 --   alter table public.users add column if not exists otp_expires_at timestamptz;
 
 -- ── Gear exchange listings ─────────────────────────────────────────
+-- Column names here mirror the table already provisioned in Supabase; the app
+-- maps its domain model onto them in `lib/supabase.ts` (`toListingsRow`).
+-- `id` is a uuid: the client generates one with `crypto.randomUUID()`.
 create table if not exists public.listings (
-  id           text primary key,
-  title        text        not null,
-  subtitle     text,
-  category     text        not null,
-  listing_type text        not null check (listing_type in ('rent','sale','donate')),
-  price        integer,
-  price_unit   text check (price_unit in ('semester','one-time')),
-  condition    text        not null,
-  seller       text        not null,
-  branch       text        not null,
-  year         text        not null,
-  spot         text        not null,
-  phone        text        not null,
-  posted_ago   text,
-  featured     boolean     not null default false,
-  verified     boolean     not null default false,
-  created_at   timestamptz not null default now()
+  id             uuid primary key default gen_random_uuid(),
+  title          text        not null,
+  category       text        not null,
+  type           text        not null check (type in ('rent','sale','donate')),
+  price          integer     not null default 0,
+  condition      text        not null,
+  seller_name    text        not null,
+  seller_contact text        not null,
+  meetup_spot    text        not null,
+  branch         text        not null,
+  created_at     timestamptz not null default now()
 );
 
 -- ── Row Level Security ─────────────────────────────────────────────

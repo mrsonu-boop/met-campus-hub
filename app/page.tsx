@@ -25,9 +25,9 @@ import { ListResourceModal } from "@/components/ListResourceModal";
 import { NOTE_SETS, SEED_LISTINGS, SEED_TRANSACTIONS } from "@/lib/data";
 import {
   isSupabaseConfigured,
-  listingToRow,
   rowToListing,
   supabase,
+  toListingsRow,
   type ListingsRow,
 } from "@/lib/supabase";
 import type {
@@ -111,7 +111,10 @@ function CampusHub() {
 
     void (async () => {
       try {
-        const { data, error } = await supabase.from("listings").select("*");
+        const { data, error } = await supabase
+          .from("listings")
+          .select("*")
+          .order("created_at", { ascending: false });
         if (cancelled || error || !data || data.length === 0) return;
         setListings((data as ListingsRow[]).map(rowToListing));
       } catch {
@@ -124,16 +127,41 @@ function CampusHub() {
     };
   }, []);
 
-  /** Mirrors a new listing to the cloud so other devices pick it up. */
-  const persistListing = useCallback(async (listing: GearListing) => {
-    if (!supabase) return;
-    try {
-      const { error } = await supabase.from("listings").insert(listingToRow(listing));
-      if (error) console.error("Supabase listing insert failed:", error.message);
-    } catch (error) {
-      console.error("Supabase listing insert failed:", error);
-    }
-  }, []);
+  /**
+   * Writes a new listing to Supabase and returns the stored row.
+   *
+   * The `listings.id` column is a `uuid`, so the app's readable `gear-…` id
+   * cannot be used as the primary key. A UUID is generated here instead and the
+   * id returned by Postgres becomes the listing's identity, which keeps
+   * contact/handoff actions pointing at the right row.
+   *
+   * Returns `null` when the write fails, so the caller can keep the optimistic
+   * copy and surface the failure rather than pretending it was saved.
+   */
+  const persistListing = useCallback(
+    async (listing: GearListing): Promise<ListingsRow | null> => {
+      if (!supabase) return null;
+      try {
+        const id = crypto.randomUUID();
+        const createdAt = new Date().toISOString();
+        const { data, error } = await supabase
+          .from("listings")
+          .insert(toListingsRow(listing, id, createdAt))
+          .select()
+          .single();
+
+        if (error) {
+          console.error("Supabase listing insert failed:", error.message);
+          return null;
+        }
+        return (data ?? { ...toListingsRow(listing, id, createdAt) }) as ListingsRow;
+      } catch (error) {
+        console.error("Supabase listing insert failed:", error);
+        return null;
+      }
+    },
+    [],
+  );
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -225,13 +253,32 @@ function CampusHub() {
 
   const handleNewListing = useCallback(
     (listing: GearListing) => {
-      // Optimistic: show it immediately, sync in the background.
+      // Optimistic: show it immediately with a local id, then swap in the
+      // Postgres row once the insert resolves so the card carries the real
+      // uuid that contact/handoff actions depend on.
       setListings((prev) => [listing, ...prev]);
       setActiveTab("gear");
       setCategory("All Items");
       setTypeFilter("All");
-      void persistListing(listing);
-      showToast(`"${listing.title}" is live on the Gear Exchange.`);
+
+      void (async () => {
+        const row = await persistListing(listing);
+
+        if (!row) {
+          // Local mode (no Supabase) — nothing to reconcile.
+          if (isSupabaseConfigured()) {
+            showToast(`"${listing.title}" is visible here but could not be synced.`);
+          } else {
+            showToast(`"${listing.title}" is live on the Gear Exchange.`);
+          }
+          return;
+        }
+
+        setListings((prev) =>
+          prev.map((item) => (item.id === listing.id ? rowToListing(row) : item)),
+        );
+        showToast(`"${listing.title}" is live on the Gear Exchange.`);
+      })();
     },
     [persistListing, showToast],
   );
