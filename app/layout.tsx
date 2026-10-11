@@ -64,9 +64,9 @@ export default function RootLayout({
         <ThemeProvider>
           {/* Ambient backdrop: dot-grid + two very soft brand washes. */}
           <div className="pointer-events-none fixed inset-0 z-0">
-            <div className="grid-bg noise-mask absolute inset-0 opacity-[0.28] dark:opacity-[0.35]" />
-            <div className="absolute -top-40 left-1/2 h-[26rem] w-[52rem] -translate-x-1/2 rounded-full bg-emerald-500/[0.07] blur-[120px]" />
-            <div className="absolute -top-24 right-0 h-[24rem] w-[34rem] rounded-full bg-indigo-500/[0.07] blur-[120px]" />
+            <div className="grid-bg noise-mask absolute inset-0 opacity-[0.2] dark:opacity-[0.26]" />
+            <div className="absolute -top-40 left-1/2 h-[26rem] w-[52rem] -translate-x-1/2 rounded-full bg-emerald-500/[0.05] blur-[130px]" />
+            <div className="absolute -top-24 right-0 h-[24rem] w-[34rem] rounded-full bg-sky-500/[0.05] blur-[130px]" />
           </div>
           <div className="relative z-10 flex min-h-dvh flex-col">{children}</div>
         </ThemeProvider>

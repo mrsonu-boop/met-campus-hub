@@ -6,6 +6,7 @@ import {
   ChevronDown,
   GraduationCap,
   Headphones,
+  HelpCircle,
   LogOut,
   Plus,
   Radio,
@@ -29,6 +30,7 @@ interface HeaderProps {
   onListResource: () => void;
   onFocusSearch: () => void;
   onSignIn: () => void;
+  onHowToUse: () => void;
   /** True when Supabase env vars are present, so the ticker can be honest. */
   cloudSync?: boolean;
 }
@@ -46,6 +48,7 @@ export function Header({
   onListResource,
   onFocusSearch,
   onSignIn,
+  onHowToUse,
   cloudSync = false,
 }: HeaderProps) {
   const searchRef = useRef<HTMLInputElement>(null);
@@ -89,16 +92,13 @@ export function Header({
               </h1>
               <span className="pill border-brand/25 bg-brand/10 text-brand">
                 <span className="relative flex h-1.5 w-1.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping-slow rounded-full bg-brand" />
                   <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-brand" />
                 </span>
-                <span className="font-mono uppercase tracking-wide">
-                  MET BKC IOE &bull; Campus Live
-                </span>
+                <span className="font-mono uppercase tracking-wide">MET BKC IOE</span>
               </span>
             </div>
             <p className="hidden text-xs text-muted sm:block">
-              Equipment exchange &amp; academic repository
+              Campus gear &amp; study notes &mdash; built for MET students
             </p>
           </div>
         </div>
@@ -116,6 +116,15 @@ export function Header({
           >
             <Headphones className="h-4 w-4" />
             Contact Support
+          </button>
+
+          <button
+            type="button"
+            onClick={onHowToUse}
+            className="inline-flex items-center gap-2 rounded-lg border border-line bg-elevated px-3 py-2 text-sm font-medium text-muted transition hover:border-line-strong hover:text-fg"
+          >
+            <HelpCircle className="h-4 w-4 text-brand" />
+            <span className="hidden sm:inline">How to Use</span>
           </button>
 
           <button
@@ -296,15 +305,15 @@ export function Header({
         <div className="mx-auto flex max-w-7xl items-center gap-5 px-4 py-1.5 font-mono text-[10px] uppercase tracking-wider text-faint sm:px-6 lg:px-8">
           <span className="inline-flex items-center gap-1.5 text-muted">
             <Radio className="h-3 w-3 text-brand" />
-            1,284 active students
+            List gear in under a minute &mdash; no charges, no commission
           </span>
           <span className="h-3 w-px bg-line" />
           <span className="inline-flex items-center gap-1.5">
-            <Sparkles className="h-3 w-3 text-indigo-400" />
-            62 notes verified this semester
+            <Sparkles className="h-3 w-3 text-brand" />
+            Handoffs at campus spots &mdash; canteen, workshop, library
           </span>
           <span className="h-3 w-px bg-line" />
-          <span>Handoff slots open until 7:00 PM</span>
+          <span>Notes map to the official SPPU syllabus</span>
           <span className="h-3 w-px bg-line" />
           <span className="inline-flex items-center gap-1.5">
             <Radio className={`h-3 w-3 ${cloudSync ? "text-brand" : "text-faint"}`} />

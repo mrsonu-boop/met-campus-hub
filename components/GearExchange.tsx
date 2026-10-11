@@ -156,6 +156,14 @@ function emptyCopy(
   return "The exchange is empty. List the first resource for your branch.";
 }
 
+/** Shortens a campus spot into the friendly "Meetup at …" badge label. */
+function meetupLabel(spot: string): string {
+  if (spot.includes("Canteen")) return "Meetup at Canteen";
+  if (spot.includes("Library")) return "Meetup at Library";
+  if (spot.includes("Workshop")) return "Meetup at Workshop";
+  return "Campus Meetup";
+}
+
 function GearCard({
   listing,
   onContact,
@@ -246,8 +254,20 @@ function GearCard({
         </dl>
 
         <div className="mt-auto space-y-3 pt-1">
-          <div className="flex items-center gap-1.5 text-xs text-muted">
-            <MapPin className="h-3 w-3 shrink-0 text-faint" />
+          <div className="flex flex-wrap items-center gap-1.5">
+            {listing.verified && (
+              <span className="inline-flex items-center gap-1 rounded-md border border-line-strong bg-elevated/70 px-2 py-0.5 text-[11px] font-medium text-fg">
+                <ShieldCheck className="h-3 w-3 text-brand" aria-hidden />
+                Verified Student
+              </span>
+            )}
+            <span className="inline-flex items-center gap-1 rounded-md border border-line-strong bg-elevated/70 px-2 py-0.5 text-[11px] font-medium text-fg">
+              <MapPin className="h-3 w-3 text-brand" aria-hidden />
+              {meetupLabel(listing.spot)}
+            </span>
+          </div>
+
+          <div className="text-xs text-muted">
             <span className="truncate">{listing.spot}</span>
           </div>
 

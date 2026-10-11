@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   BookOpen,
   Lightbulb,
-  Loader2,
   RotateCcw,
   Send,
   Sparkles,
@@ -99,7 +98,13 @@ Provide a concise, accurate, and easy-to-understand response formatted with bull
         },
       ];
 
-      setMessages((prev) => [...prev, userMessage]);
+      const assistantId = `a-${Date.now()}`;
+
+      setMessages((prev) => [
+        ...prev,
+        userMessage,
+        { id: assistantId, role: "assistant", content: "", streaming: true },
+      ]);
       setInput("");
       setError(null);
       setPending(true);
@@ -111,14 +116,46 @@ Provide a concise, accurate, and easy-to-understand response formatted with bull
           body: JSON.stringify({ contents }),
         });
 
-        const data = (await response.json()) as { text?: string; error?: string };
-        if (!response.ok) throw new Error(data.error ?? "Something went wrong");
+        if (!response.ok) {
+          const data = (await response.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(data?.error ?? "Something went wrong");
+        }
 
-        setMessages((prev) => [
-          ...prev,
-          { id: `a-${Date.now()}`, role: "assistant", content: data.text?.trim() || "…" },
-        ]);
+        if (!response.body) throw new Error("No response body received");
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        // Stream chunk deltas into the latest assistant message so the reply
+        // types out live instead of appearing all at once.
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) buffer += decoder.decode(value, { stream: true });
+          const content = buffer.trim();
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === assistantId ? { ...message, content } : message,
+            ),
+          );
+        }
+
+        const finalContent = buffer.trim();
+        if (finalContent.includes("[AI_ERROR]")) {
+          throw new Error(finalContent.split("[AI_ERROR]")[1].trim());
+        }
+
+        setMessages((prev) =>
+          prev.map((message) =>
+            message.id === assistantId
+              ? { ...message, content: finalContent || "…", streaming: false }
+              : message,
+          ),
+        );
       } catch (caught) {
+        // Drop the empty placeholder and surface the real reason instead.
+        setMessages((prev) => prev.filter((message) => message.id !== assistantId));
         setError(
           caught instanceof Error
             ? caught.message
@@ -146,10 +183,10 @@ Provide a concise, accurate, and easy-to-understand response formatted with bull
         className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md animate-drawer-in flex-col border-l border-line bg-surface shadow-2xl shadow-black/60"
       >
         {/* Header */}
-        <header className="flex items-start justify-between gap-3 border-b border-line bg-gradient-to-r from-indigo-500/10 via-violet-500/5 to-transparent px-5 py-4">
+        <header className="flex items-start justify-between gap-3 border-b border-line bg-sunken/40 px-5 py-4">
           <div className="flex min-w-0 items-start gap-3">
-            <span className="relative mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 glow-indigo">
-              <Sparkles className="h-4.5 w-4.5 text-fg" />
+            <span className="relative mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-emerald-500/10">
+              <Sparkles className="h-4.5 w-4.5 text-brand" />
             </span>
             <div className="min-w-0">
               <h2 className="text-sm font-semibold tracking-tight text-fg">
@@ -174,7 +211,7 @@ Provide a concise, accurate, and easy-to-understand response formatted with bull
             <div className="animate-fade-up space-y-4">
               <div className="rounded-xl border border-line bg-sunken/60 p-4">
                 <div className="mb-2 flex items-center gap-2">
-                  <BookOpen className="h-3.5 w-3.5 text-indigo-400" />
+                  <BookOpen className="h-3.5 w-3.5 text-brand" />
                   <p className="text-xs font-medium text-muted">Context loaded</p>
                 </div>
                 <p className="text-xs leading-relaxed text-muted">
@@ -196,9 +233,9 @@ Provide a concise, accurate, and easy-to-understand response formatted with bull
                     key={suggestion}
                     type="button"
                     onClick={() => void send(suggestion)}
-                    className="flex w-full items-start gap-2 rounded-lg border border-line bg-sunken/60 px-3 py-2.5 text-left text-xs text-muted transition hover:border-indigo-500/40 hover:bg-indigo-500/[0.07] hover:text-fg"
+                    className="flex w-full items-start gap-2 rounded-lg border border-line bg-sunken/60 px-3 py-2.5 text-left text-xs text-muted transition hover:border-brand/25 hover:bg-emerald-500/[0.06] hover:text-fg"
                   >
-                    <Sparkles className="mt-0.5 h-3 w-3 shrink-0 text-indigo-400" />
+                    <Sparkles className="mt-0.5 h-3 w-3 shrink-0 text-brand" />
                     {suggestion}
                   </button>
                 ))}
@@ -209,18 +246,6 @@ Provide a concise, accurate, and easy-to-understand response formatted with bull
           {messages.map((message) => (
             <Bubble key={message.id} message={message} />
           ))}
-
-          {pending && (
-            <div className="flex gap-2.5 animate-fade-in">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600">
-                <Sparkles className="h-3.5 w-3.5 text-fg" />
-              </div>
-              <div className="flex items-center gap-2 rounded-xl rounded-tl-sm border border-line bg-sunken/70 px-3.5 py-2.5">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-400" />
-                <span className="text-xs text-muted">Thinking through the unit…</span>
-              </div>
-            </div>
-          )}
 
           {error && (
             <div className="rounded-lg border border-rose-500/25 bg-rose-500/[0.08] px-3.5 py-2.5 text-xs text-rose-600 dark:text-rose-300">
@@ -265,20 +290,20 @@ Provide a concise, accurate, and easy-to-understand response formatted with bull
               }}
               placeholder="Ask about this unit…"
               aria-label="Ask the AI study assistant"
-              className="scroll-thin max-h-28 min-h-9 flex-1 resize-none rounded-lg border border-line bg-sunken px-3 py-2 text-sm text-fg placeholder:text-faint outline-none transition focus:border-indigo-500/60 focus:ring-2 focus:ring-indigo-500/15"
+              className="scroll-thin max-h-28 min-h-9 flex-1 resize-none rounded-lg border border-line bg-sunken px-3 py-2 text-sm text-fg placeholder:text-faint outline-none transition focus:border-brand/60 focus:ring-2 focus:ring-brand/15"
             />
             <button
               type="submit"
               disabled={!input.trim() || pending}
               aria-label="Send question"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 text-fg transition hover:from-indigo-400 hover:to-violet-400 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand text-on-brand transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Send className="h-4 w-4" />
             </button>
           </div>
           <p className="mt-2 text-[10px] text-faint">
-            Gemini 2.5 Flash · answers are study aids, always cross-check against the official SPPU
-            syllabus.
+            Powered by Google Gemini — answers are study aids, always cross-check against the
+            official SPPU syllabus.
           </p>
         </form>
       </aside>
@@ -304,11 +329,18 @@ function Bubble({ message }: { message: ChatMessage }) {
 
   return (
     <div className="flex gap-2.5 animate-fade-up">
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600">
-        <Sparkles className="h-3.5 w-3.5 text-fg" />
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-emerald-500/10">
+        <Sparkles className="h-3.5 w-3.5 text-brand" />
       </div>
       <div className="max-w-[85%] rounded-xl rounded-tl-sm border border-line bg-sunken/70 px-3.5 py-2.5">
-        <AssistantBody text={message.content} />
+        {message.content ? (
+          <AssistantBody text={message.content} />
+        ) : (
+          <span
+            aria-label="Assistant is typing"
+            className="inline-block h-4 w-1.5 animate-pulse rounded-full bg-brand/70"
+          />
+        )}
       </div>
     </div>
   );
@@ -326,7 +358,7 @@ function AssistantBody({ text }: { text: string }) {
 
         if (/^#{1,6}\s/.test(line)) {
           return (
-            <p key={index} className="pt-1 text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+            <p key={index} className="pt-1 text-xs font-semibold uppercase tracking-wide text-brand">
               {line.replace(/^#{1,6}\s/, "")}
             </p>
           );
@@ -336,7 +368,7 @@ function AssistantBody({ text }: { text: string }) {
         if (bullet) {
           return (
             <p key={index} className="flex gap-2 pl-0.5">
-              <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-indigo-400" />
+              <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-brand/60" />
               <span className="min-w-0 flex-1">{bold(bullet[1])}</span>
             </p>
           );
@@ -346,7 +378,7 @@ function AssistantBody({ text }: { text: string }) {
         if (numbered) {
           return (
             <p key={index} className="flex gap-2 pl-0.5">
-              <span className="font-mono text-xs text-indigo-400">{numbered[1]}.</span>
+              <span className="font-mono text-xs text-brand">{numbered[1]}.</span>
               <span className="min-w-0 flex-1">{bold(numbered[2])}</span>
             </p>
           );

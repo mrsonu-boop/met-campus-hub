@@ -21,6 +21,7 @@ import { GearExchange } from "@/components/GearExchange";
 import { Header } from "@/components/Header";
 import { KnowledgeVault } from "@/components/KnowledgeVault";
 import { ListResourceModal } from "@/components/ListResourceModal";
+import { OnboardingModal } from "@/components/OnboardingModal";
 
 import { NOTE_SETS, SEED_LISTINGS, SEED_TRANSACTIONS } from "@/lib/data";
 import {
@@ -93,6 +94,7 @@ function CampusHub() {
   const [listModalOpen, setListModalOpen] = useState(false);
   const [aiContext, setAiContext] = useState<AiContext | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
 
   const [authOpen, setAuthOpen] = useState(false);
   const [authIntent, setAuthIntent] = useState<string | null>(null);
@@ -125,6 +127,25 @@ function CampusHub() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  // First-time visitors see the three-step guide once; "How to Use" reopens it.
+  useEffect(() => {
+    try {
+      if (!window.localStorage.getItem("met_hub_onboarding")) setOnboardingOpen(true);
+    } catch {
+      // localStorage unavailable (private mode) — just show the guide.
+      setOnboardingOpen(true);
+    }
+  }, []);
+
+  const dismissOnboarding = useCallback(() => {
+    try {
+      window.localStorage.setItem("met_hub_onboarding", "1");
+    } catch {
+      /* never block closing the guide */
+    }
+    setOnboardingOpen(false);
   }, []);
 
   /**
@@ -322,6 +343,7 @@ function CampusHub() {
           setAuthTab("signin");
           setAuthOpen(true);
         }}
+        onHowToUse={() => setOnboardingOpen(true)}
       />
 
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
@@ -470,6 +492,8 @@ function CampusHub() {
           onClose={() => setAiContext(null)}
         />
       )}
+
+      <OnboardingModal open={onboardingOpen} onClose={dismissOnboarding} />
 
       {/* Screen-reader announcement of the active identity. */}
       <p className="sr-only" aria-live="polite">

@@ -29,37 +29,86 @@ function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
+const encoder = new TextEncoder();
+
+type GeminiContents = Parameters<GoogleGenAI['models']['generateContentStream']>[0]['contents'];
+
 export async function POST(req: Request) {
+  let contents: GeminiContents;
+
   try {
-    const { contents } = await req.json();
-
-    if (!contents) {
-      return NextResponse.json({ error: 'Message contents required' }, { status: 400 });
-    }
-
-    const generate = () => getClient().models.generateContent({ model: MODEL, contents });
-
-    let response: Awaited<ReturnType<typeof generate>>;
-    try {
-      // Primary API call
-      response = await generate();
-    } catch (apiError: unknown) {
-      // If 503 temporary high-demand occurs, retry once after 1 second
-      if (isServiceUnavailable(apiError)) {
-        console.warn('Gemini 503 detected, retrying request in 1 second...');
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        response = await generate();
-      } else {
-        throw apiError;
-      }
-    }
-
-    return NextResponse.json({ text: response.text });
-  } catch (error: unknown) {
-    console.error('Gemini API Error:', error);
-    return NextResponse.json(
-      { error: errorMessage(error, 'Failed to process study request') },
-      { status: 500 }
-    );
+    const body = await req.json();
+    contents = body.contents as GeminiContents;
+  } catch {
+    return NextResponse.json({ error: 'Request body must be valid JSON' }, { status: 400 });
   }
+
+  if (!contents) {
+    return NextResponse.json({ error: 'Message contents required' }, { status: 400 });
+  }
+
+  // Stream the model output token-by-token so the drawer can render it live.
+  const stream = new ReadableStream({
+    async start(controller) {
+      const enqueue = (text: string) => controller.enqueue(encoder.encode(text));
+
+let generator: Awaited<ReturnType<GoogleGenAI['models']['generateContentStream']>>;
+  try {
+    const generate = () =>
+      getClient().models.generateContentStream({ model: MODEL, contents });
+
+        try {
+          generator = await generate();
+        } catch (apiError: unknown) {
+          // If 503 temporary high-demand occurs, retry once after 1 second.
+          if (isServiceUnavailable(apiError)) {
+            console.warn('Gemini 503 detected, retrying request in 1 second...');
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            generator = await generate();
+          } else {
+            throw apiError;
+          }
+        }
+      } catch (error: unknown) {
+        console.error('Gemini stream start error:', error);
+        enqueue(`\n[AI_ERROR]: ${errorMessage(error, 'Failed to start the study assistant')}`);
+        try {
+          controller.close();
+        } catch {
+          /* already closed */
+        }
+        return;
+      }
+
+      try {
+        let sawText = false;
+        for await (const chunk of generator) {
+          if (chunk.text) {
+            sawText = true;
+            enqueue(chunk.text);
+          }
+        }
+        if (!sawText) {
+          enqueue('\n[AI_ERROR]: The model returned an empty response. Try rephrasing.');
+        }
+      } catch (error: unknown) {
+        console.error('Gemini stream interrupted:', error);
+        enqueue(`\n[AI_ERROR]: ${errorMessage(error, 'The stream was interrupted')}`);
+      } finally {
+        try {
+          controller.close();
+        } catch {
+          /* already closed */
+        }
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      'X-Accel-Buffering': 'no',
+    },
+  });
 }
