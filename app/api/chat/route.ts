@@ -4,9 +4,9 @@ import { GoogleGenAI } from '@google/genai';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// Fastest flash tiers. The active model is tried first; if the API reports the
-// model is unavailable we fall back to the next candidate automatically.
-const MODEL_CANDIDATES = ['gemini-2.5-flash', 'gemini-1.5-flash'] as const;
+// Fastest flash tier — kept intentionally small for first-token latency.
+// Passed bare (no `models/` prefix); the SDK adds it when calling the API.
+const MODEL_CANDIDATES = ['gemini-2.5-flash'] as const;
 
 let client: GoogleGenAI | null = null;
 
