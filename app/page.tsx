@@ -350,7 +350,7 @@ function CampusHub() {
         {/* Hero — elegant serif headline over the pastel glass. */}
         <section className="animate-fade-up mb-8">
           <span className="pill border-brand/25 bg-brand/[0.07] text-brand">
-            MET BKC IOE &middot; Pune
+            MET BKC IOE &middot; Nashik
           </span>
           <h1 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-fg sm:text-[2.6rem] sm:leading-[1.1]">
             Study smarter, every single day.
