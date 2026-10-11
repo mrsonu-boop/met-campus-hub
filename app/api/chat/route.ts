@@ -4,8 +4,9 @@ import { GoogleGenAI } from '@google/genai';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// Fastest available flash tier — kept intentionally small for first-token latency.
-const MODEL = 'gemini-1.5-flash';
+// Fastest flash tiers. The active model is tried first; if the API reports the
+// model is unavailable we fall back to the next candidate automatically.
+const MODEL_CANDIDATES = ['gemini-2.5-flash', 'gemini-1.5-flash'] as const;
 
 let client: GoogleGenAI | null = null;
 
@@ -26,6 +27,13 @@ function isServiceUnavailable(error: unknown): boolean {
   return status === 503 || (typeof message === 'string' && message.includes('503'));
 }
 
+function isModelNotFound(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const { status, message } = error as { status?: unknown; message?: unknown };
+  const text = typeof message === 'string' ? message : '';
+  return status === 404 || text.includes('NOT_FOUND') || text.includes('not found for API version');
+}
+
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
 }
@@ -33,6 +41,40 @@ function errorMessage(error: unknown, fallback: string): string {
 const encoder = new TextEncoder();
 
 type GeminiContents = Parameters<GoogleGenAI['models']['generateContentStream']>[0]['contents'];
+
+/**
+ * Opens a streaming generator, walking the candidate model list. A 503 is
+ * retried once after a short pause; a 404 / NOT_FOUND moves to the next model.
+ */
+async function openGenerator(client: GoogleGenAI, contents: GeminiContents) {
+  let lastError: unknown = null;
+
+  for (const model of MODEL_CANDIDATES) {
+    const generate = () => client.models.generateContentStream({ model, contents });
+
+    try {
+      return await generate();
+    } catch (apiError: unknown) {
+      if (isModelNotFound(apiError) && model !== MODEL_CANDIDATES[MODEL_CANDIDATES.length - 1]) {
+        console.warn(`Gemini model "${model}" unavailable, falling back to next candidate...`);
+        lastError = apiError;
+        continue;
+      }
+      if (isServiceUnavailable(apiError)) {
+        console.warn(`Gemini model "${model}" returned 503, retrying in 1 second...`);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        try {
+          return await generate();
+        } catch /* retry also failed */ {
+          /* fall through to rethrow below */
+        }
+      }
+      throw apiError;
+    }
+  }
+
+  throw lastError ?? new Error('No Gemini model candidate could be started');
+}
 
 export async function POST(req: Request) {
   let contents: GeminiContents;
@@ -53,23 +95,9 @@ export async function POST(req: Request) {
     async start(controller) {
       const enqueue = (text: string) => controller.enqueue(encoder.encode(text));
 
-let generator: Awaited<ReturnType<GoogleGenAI['models']['generateContentStream']>>;
-  try {
-    const generate = () =>
-      getClient().models.generateContentStream({ model: MODEL, contents });
-
-        try {
-          generator = await generate();
-        } catch (apiError: unknown) {
-          // If 503 temporary high-demand occurs, retry once after 1 second.
-          if (isServiceUnavailable(apiError)) {
-            console.warn('Gemini 503 detected, retrying request in 1 second...');
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-            generator = await generate();
-          } else {
-            throw apiError;
-          }
-        }
+      let generator: Awaited<ReturnType<GoogleGenAI['models']['generateContentStream']>>;
+      try {
+        generator = await openGenerator(getClient(), contents);
       } catch (error: unknown) {
         console.error('Gemini stream start error:', error);
         enqueue(`\n[AI_ERROR]: ${errorMessage(error, 'Failed to start the study assistant')}`);
