@@ -87,9 +87,9 @@ export function Header({
 
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h1 className="truncate text-[15px] font-semibold tracking-tight text-fg">
+              <span className="truncate font-display text-[17px] font-semibold tracking-tight text-fg">
                 MET Campus Hub
-              </h1>
+              </span>
               <span className="pill border-brand/25 bg-brand/10 text-brand">
                 <span className="relative flex h-1.5 w-1.5">
                   <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-brand" />
@@ -130,7 +130,7 @@ export function Header({
           <button
             type="button"
             onClick={onListResource}
-            className="group inline-flex items-center gap-2 rounded-lg bg-brand px-3.5 py-2 text-sm font-semibold text-on-brand transition hover:opacity-90"
+            className="btn-primary group gap-2 px-3.5 py-2"
           >
             <Plus className="h-4 w-4 transition-transform duration-200 group-hover:rotate-90" />
             <span className="hidden sm:inline">List Resource</span>

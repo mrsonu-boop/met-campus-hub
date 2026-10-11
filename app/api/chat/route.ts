@@ -4,7 +4,8 @@ import { GoogleGenAI } from '@google/genai';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const MODEL = 'gemini-3.8-flash';
+// Fastest available flash tier — kept intentionally small for first-token latency.
+const MODEL = 'gemini-2.5-flash';
 
 let client: GoogleGenAI | null = null;
 

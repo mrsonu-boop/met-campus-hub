@@ -102,7 +102,7 @@ export function CampusExchange({
           </p>
         </div>
 
-        <div className="flex items-center gap-1 rounded-lg border border-line bg-surface p-1">
+        <div className="flex items-center gap-1 rounded-full border border-line/80 bg-white/60 p-1 shadow-sm backdrop-blur-md dark:bg-white/[0.06]">
           {TABS.map((item) => {
             const activeTab = tab === item.id;
             const count = counts[item.id];
@@ -112,10 +112,10 @@ export function CampusExchange({
                 type="button"
                 onClick={() => setTab(item.id)}
                 aria-pressed={activeTab}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                   activeTab
-                    ? "bg-surface text-fg shadow-sm"
-                    : "text-muted hover:bg-elevated hover:text-fg"
+                    ? "bg-white text-fg shadow-sm ring-1 ring-line/80 dark:bg-white/10 dark:ring-white/10"
+                    : "text-muted hover:bg-white/40 hover:text-fg dark:hover:bg-white/5"
                 }`}
               >
                 {item.label}
@@ -391,7 +391,7 @@ function HandoffPanel({
               type="button"
               onClick={verify}
               disabled={done || pin.length !== 4}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 text-sm font-semibold text-on-brand transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+              className="btn-primary gap-1.5 px-4"
             >
               <PackageCheck className="h-4 w-4" />
               Verify

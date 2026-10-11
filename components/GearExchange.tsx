@@ -61,7 +61,7 @@ export function GearExchange({
           })}
         </div>
 
-        <div className="flex shrink-0 items-center gap-1 self-start rounded-lg border border-line bg-elevated/60 p-1">
+        <div className="flex shrink-0 items-center gap-1 self-start rounded-full border border-line/80 bg-white/60 p-1 shadow-sm backdrop-blur-md dark:bg-white/[0.06]">
           {TYPE_FILTERS.map((option) => {
             const active = typeFilter === option;
             return (
@@ -70,8 +70,10 @@ export function GearExchange({
                 type="button"
                 onClick={() => onTypeFilterChange(option)}
                 aria-pressed={active}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                  active ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg"
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                  active
+                    ? "bg-white text-fg shadow-sm ring-1 ring-line/80 dark:bg-white/10 dark:ring-white/10"
+                    : "text-muted hover:bg-white/40 hover:text-fg dark:hover:bg-white/5"
                 }`}
               >
                 {option === "All" ? "All" : LISTING_TYPE_LABEL[option]}
@@ -256,12 +258,12 @@ function GearCard({
         <div className="mt-auto space-y-3 pt-1">
           <div className="flex flex-wrap items-center gap-1.5">
             {listing.verified && (
-              <span className="inline-flex items-center gap-1 rounded-md border border-line-strong bg-elevated/70 px-2 py-0.5 text-[11px] font-medium text-fg">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/70 px-2.5 py-1 text-[11px] font-medium text-fg dark:bg-white/[0.06]">
                 <ShieldCheck className="h-3 w-3 text-brand" aria-hidden />
                 Verified Student
               </span>
             )}
-            <span className="inline-flex items-center gap-1 rounded-md border border-line-strong bg-elevated/70 px-2 py-0.5 text-[11px] font-medium text-fg">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/70 px-2.5 py-1 text-[11px] font-medium text-fg dark:bg-white/[0.06]">
               <MapPin className="h-3 w-3 text-brand" aria-hidden />
               {meetupLabel(listing.spot)}
             </span>
@@ -274,7 +276,7 @@ function GearCard({
           <button
             type="button"
             onClick={() => onContact(listing)}
-            className="w-full rounded-lg bg-fg px-3 py-2 text-sm font-semibold text-canvas transition hover:opacity-90"
+            className="btn-primary w-full gap-1.5 px-6 py-2.5"
           >
             Contact Seller
           </button>

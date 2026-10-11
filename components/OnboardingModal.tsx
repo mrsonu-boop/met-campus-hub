@@ -58,8 +58,8 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
         aria-hidden
       />
 
-      <div className="relative w-full max-w-md animate-scale-in overflow-hidden rounded-t-2xl border border-line bg-surface shadow-2xl shadow-black/70 sm:rounded-2xl">
-        <div className="flex items-start justify-between gap-3 border-b border-line bg-sunken/40 px-5 py-4">
+      <div className="relative w-full max-w-md animate-scale-in overflow-hidden rounded-t-3xl border border-line/80 bg-white/85 shadow-[0_24px_60px_-24px_rgb(28_25_23/0.35)] backdrop-blur-md dark:bg-[#171411]/85 sm:rounded-3xl">
+        <div className="flex items-start justify-between gap-3 border-b border-line bg-white/50 px-5 py-4 dark:bg-white/[0.03]">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-emerald-500/10">
               <HelpCircle className="h-5 w-5 text-brand" />
@@ -106,7 +106,7 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
           <button
             type="button"
             onClick={onClose}
-            className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-on-brand transition hover:opacity-90"
+            className="btn-primary w-full"
           >
             Got it — let&apos;s go
           </button>

@@ -119,7 +119,7 @@ export function ListResourceModal({ open, onClose, onSubmit }: ListResourceModal
         aria-hidden
       />
 
-      <div className="relative max-h-[92dvh] w-full max-w-lg animate-scale-in overflow-y-auto rounded-t-2xl border border-line bg-surface shadow-2xl shadow-black/70 scroll-thin sm:rounded-2xl">
+      <div className="relative max-h-[92dvh] w-full max-w-lg animate-scale-in overflow-y-auto rounded-t-3xl border border-line/80 bg-white/90 shadow-2xl shadow-black/50 backdrop-blur-md dark:bg-[#171411]/90 scroll-thin sm:rounded-3xl">
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-line bg-surface/95 px-5 py-4 backdrop-blur">
           <div className="flex items-start gap-3">

@@ -111,7 +111,7 @@ function NoteSetCard({
               >
                 {noteSet.courseCode}
               </span>
-              <span className="inline-flex items-center gap-1 rounded border border-brand/20 bg-brand/[0.07] px-1.5 py-0.5 text-[10px] font-medium text-brand">
+              <span className="inline-flex items-center gap-1 rounded-full border border-brand/20 bg-brand/[0.07] px-2 py-0.5 text-[10px] font-medium text-brand">
                 <BadgeCheck className="h-2.5 w-2.5 shrink-0" />
                 Syllabus Aligned
               </span>
@@ -196,7 +196,7 @@ function NoteSetCard({
                       <button
                         type="button"
                         onClick={() => handleDownload(noteSet, unit)}
-                        className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-xs font-semibold text-fg transition hover:bg-elevated"
+                        className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border border-line bg-white/70 px-3 py-2 text-xs font-medium text-fg transition hover:border-line-strong hover:bg-white dark:bg-white/[0.06] dark:hover:bg-white/10"
                       >
                         <Download className="h-3.5 w-3.5" />
                         Download PDF
@@ -204,7 +204,7 @@ function NoteSetCard({
                       <button
                         type="button"
                         onClick={() => onAskAi(noteSet, unit)}
-                        className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-on-brand transition hover:opacity-90"
+                        className="btn-primary flex-1 gap-1.5 px-4 py-2"
                       >
                         <Sparkles className="h-3.5 w-3.5" />
                         Ask AI Assistant
@@ -217,10 +217,10 @@ function NoteSetCard({
           })}
         </div>
 
-        <button
+<button
           type="button"
           onClick={() => onAskAi(noteSet, activeUnit)}
-          className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand/25 bg-brand/[0.07] px-3 py-2 text-xs font-semibold text-brand transition hover:bg-brand/15"
+          className="inline-flex items-center justify-center gap-2 rounded-full border border-brand/25 bg-brand/[0.06] px-4 py-2 text-xs font-medium text-brand transition hover:bg-brand/15"
         >
           <Sparkles className="h-3.5 w-3.5" />
           Ask AI about this whole subject

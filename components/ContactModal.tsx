@@ -51,7 +51,7 @@ export function ContactModal({ listing, onClose }: ContactModalProps) {
         aria-hidden
       />
 
-      <div className="relative w-full max-w-md animate-scale-in overflow-hidden rounded-t-2xl border border-line bg-surface shadow-2xl shadow-black/70 sm:rounded-2xl">
+      <div className="relative w-full max-w-md animate-scale-in overflow-hidden rounded-t-3xl border border-line/80 bg-white/90 shadow-2xl shadow-black/50 backdrop-blur-md dark:bg-[#171411]/90 sm:rounded-3xl">
         <div className="flex items-start justify-between gap-3 border-b border-line p-5">
           <div className="flex min-w-0 items-start gap-3">
             <div
@@ -126,14 +126,14 @@ export function ContactModal({ listing, onClose }: ContactModalProps) {
               href={`https://wa.me/${digits}?text=${whatsappText}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-3 py-2.5 text-sm font-semibold text-on-brand transition hover:bg-emerald-400"
+              className="btn-primary gap-2"
             >
               <MessageCircle className="h-4 w-4" />
               WhatsApp
             </a>
             <a
               href={`tel:${digits}`}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-line-strong bg-elevated px-3 py-2.5 text-sm font-medium text-fg transition hover:border-line hover:bg-sunken"
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-line-strong bg-white/70 px-4 py-2.5 text-sm font-medium text-fg transition hover:border-line hover:bg-white dark:bg-white/[0.06] dark:hover:bg-white/10"
             >
               <Phone className="h-4 w-4" />
               Call now
@@ -167,7 +167,7 @@ export function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-on-brand transition hover:bg-emerald-400 disabled:opacity-50"
+      className="btn-primary gap-2"
     >
       {pending ? "Publishing…" : "Publish to Campus Exchange"}
     </button>

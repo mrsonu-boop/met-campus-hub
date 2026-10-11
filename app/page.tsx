@@ -346,13 +346,27 @@ function CampusHub() {
         onHowToUse={() => setOnboardingOpen(true)}
       />
 
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-        {/* Segmented control */}
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+        {/* Hero — elegant serif headline over the pastel glass. */}
+        <section className="animate-fade-up mb-8">
+          <span className="pill border-brand/25 bg-brand/[0.07] text-brand">
+            MET BKC IOE &middot; Pune
+          </span>
+          <h1 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-fg sm:text-[2.6rem] sm:leading-[1.1]">
+            Study smarter, every single day.
+          </h1>
+          <p className="mt-2.5 max-w-xl text-sm leading-relaxed text-muted sm:text-[15px]">
+            Rent or swap campus gear, grab SPPU-aligned notes, and ask the AI
+            assistant &mdash; all from one place, right here at MET.
+          </p>
+        </section>
+
+        {/* Segmented control — floating pill nav */}
         <div className="mb-5 flex flex-col gap-3">
           <div
             role="tablist"
             aria-label="Campus Hub sections"
-            className="scroll-thin -mx-1 flex gap-1 overflow-x-auto rounded-xl border border-line bg-elevated/60 p-1"
+            className="scroll-thin -mx-1 flex gap-1 overflow-x-auto rounded-full border border-line/80 bg-white/60 p-1 shadow-sm backdrop-blur-md dark:bg-white/[0.06]"
           >
             {TABS.map((tab) => {
               const active = activeTab === tab.id;
@@ -364,25 +378,23 @@ function CampusHub() {
                   type="button"
                   aria-selected={active}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
-                    active ? "text-fg" : "text-muted hover:text-fg"
+                  className={`relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                    active ? "text-canvas" : "text-muted hover:text-fg"
                   }`}
                 >
                   {active && (
                     <motion.span
                       layoutId="hub-tab-pill"
                       transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                      className="absolute inset-0 rounded-lg border border-line bg-surface shadow-sm"
+                      className="absolute inset-0 rounded-full bg-black shadow-[0_6px_16px_-6px_rgb(0_0_0/0.5)]"
                     />
                   )}
-                  <Icon className={`relative z-10 h-4 w-4 ${active ? "text-brand" : ""}`} />
+                  <Icon className={`relative z-10 h-4 w-4 ${active ? "text-white" : "text-brand"}`} />
                   <span className="relative z-10 hidden sm:inline">{tab.label}</span>
                   <span className="relative z-10 sm:hidden">{tab.short}</span>
                   <span
-                    className={`relative z-10 rounded px-1.5 py-0.5 font-mono text-[10px] ${
-                      active
-                        ? "bg-brand/12 text-brand"
-                        : "bg-surface text-faint"
+                    className={`relative z-10 rounded-full px-1.5 py-0.5 font-mono text-[10px] ${
+                      active ? "bg-white/20 text-white" : "bg-white/70 text-faint dark:bg-white/10"
                     }`}
                   >
                     {counts[tab.id]}

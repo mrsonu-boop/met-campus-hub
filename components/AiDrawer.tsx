@@ -180,7 +180,7 @@ Provide a concise, accurate, and easy-to-understand response formatted with bull
         role="dialog"
         aria-modal="true"
         aria-label="AI study assistant"
-        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md animate-drawer-in flex-col border-l border-line bg-surface shadow-2xl shadow-black/60"
+        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md animate-drawer-in flex-col border-l border-line bg-white/95 shadow-2xl shadow-black/40 backdrop-blur-xl dark:bg-[#171411]/95"
       >
         {/* Header */}
         <header className="flex items-start justify-between gap-3 border-b border-line bg-sunken/40 px-5 py-4">
@@ -296,7 +296,7 @@ Provide a concise, accurate, and easy-to-understand response formatted with bull
               type="submit"
               disabled={!input.trim() || pending}
               aria-label="Send question"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand text-on-brand transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Send className="h-4 w-4" />
             </button>
