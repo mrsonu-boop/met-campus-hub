@@ -337,7 +337,6 @@ function CampusHub() {
           )
         }
         onFocusSearch={() => setSearch((prev) => prev)}
-        cloudSync={isSupabaseConfigured()}
         onSignIn={() => {
           setAuthIntent(null);
           setAuthTab("signin");
@@ -346,9 +345,9 @@ function CampusHub() {
         onHowToUse={() => setOnboardingOpen(true)}
       />
 
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
         {/* Hero — elegant serif headline over the pastel glass. */}
-        <section className="animate-fade-up mb-8">
+        <section className="animate-fade-up mb-7">
           <span className="pill border-brand/25 bg-brand/[0.07] text-brand">
             MET BKC IOE &middot; Nashik
           </span>
