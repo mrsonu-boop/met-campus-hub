@@ -137,13 +137,59 @@ const SAMPLE_LISTINGS: Listing[] = [
 
 const DEPARTMENTS = ["All Branches", "Computer", "Mechanical", "E&TC", "Civil", "AIDS"];
 const YEARS = ["All Years", "FE", "SE", "TE", "BE"];
-const CATEGORIES = ["All Gear", "Calculators", "Lab Kits & Drafters", "SPPU Textbooks", "Hostel Gear"];
+const CATEGORIES = ["All Gear", "Calculators", "Lab Kits & Drafters", "SPPU Textbooks", "Electronics & Microcontrollers", "Hostel Gear"];
+
+const DRAWER_CATEGORIES = [
+  { emoji: "📐", label: "Lab Kits & Drafters", value: "Lab Kits & Drafters" },
+  { emoji: "🔢", label: "Scientific Calculators", value: "Calculators" },
+  { emoji: "📚", label: "SPPU Textbooks & Notes", value: "SPPU Textbooks" },
+  { emoji: "💻", label: "Electronics & Microcontrollers", value: "Electronics & Microcontrollers" },
+  { emoji: "🏠", label: "Hostel & Room Essentials", value: "Hostel Gear" }
+];
+
+const DRAWER_LISTING_TYPES = [
+  { emoji: "🏷️", label: "Items for Rent", value: "Rent" as ListingType },
+  { emoji: "💰", label: "Items for Sale", value: "Sale" as ListingType },
+  { emoji: "🎁", label: "Free / Giveaways", value: "Free" as ListingType }
+];
+
+const DRAWER_DEPARTMENTS = [
+  { label: "First Year (FE)", kind: "year" as const, value: "FE" },
+  { label: "Computer", kind: "branch" as const, value: "Computer" },
+  { label: "Mechanical", kind: "branch" as const, value: "Mechanical" },
+  { label: "E&TC", kind: "branch" as const, value: "E&TC" },
+  { label: "Civil", kind: "branch" as const, value: "Civil" },
+  { label: "AI & Data Science", kind: "branch" as const, value: "AIDS" }
+];
 
 const REPORT_REASONS = [
   "Incorrect Price / Scam",
   "Item Already Sold",
   "Invalid PRN / Non-MET Student",
   "Inappropriate Content / Spam"
+];
+
+const TERMS_HIGHLIGHTS = [
+  {
+    title: "Student Identity",
+    desc: "Strictly for MET BKC students. Verified PRN & phone numbers required for listings."
+  },
+  {
+    title: "Damaged Item Policy",
+    desc: "Borrowers/renters are liable up to 80% replacement cost for gear damaged during usage."
+  },
+  {
+    title: "Lost Item Policy",
+    desc: "Borrowers/renters must reimburse 100% replacement cost to the owner if gear is lost."
+  },
+  {
+    title: "Safe Campus Handoffs",
+    desc: "All physical transactions must occur at designated campus zones (Main Canteen, Central Library, Workshop, Main Gate Plaza)."
+  },
+  {
+    title: "Platform Guarantee",
+    desc: "0% brokerage, direct peer-to-peer handoffs with zero hidden platform fees."
+  }
 ];
 
 const HANDOFF_ZONES = [
@@ -245,6 +291,10 @@ export default function METCampusHubFullPage() {
   const [reportSellerName, setReportSellerName] = useState("");
   const [reportFeedback, setReportFeedback] = useState("");
   const [isTermsOpen, setIsTermsOpen] = useState(false);
+  const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
+  const [selectedListingType, setSelectedListingType] = useState<"All" | ListingType>("All");
+  const [showTermsOnArrival, setShowTermsOnArrival] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const [reserveItem, setReserveItem] = useState<Listing | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -280,6 +330,68 @@ export default function METCampusHubFullPage() {
       // ignore malformed session data
     }
   }, []);
+
+  useEffect(() => {
+    // The Terms & Conditions popup is shown on every page load/refresh.
+    setShowTermsOnArrival(true);
+  }, []);
+
+  const acceptTerms = () => {
+    if (!termsAgreed) return;
+    setShowTermsOnArrival(false);
+    setIsTermsOpen(false);
+    setTermsAgreed(false);
+    showToast("Welcome to MET Campus Hub. Terms accepted.");
+  };
+
+  const openTerms = () => {
+    setTermsAgreed(false);
+    setShowTermsOnArrival(false);
+    setIsTermsOpen(true);
+  };
+
+  const closeCategories = () => setIsCategoriesOpen(false);
+
+  const applyDrawerCategory = (category: string) => {
+    setSelectedCategory(category);
+    closeCategories();
+  };
+
+  const applyDrawerListingType = (type: ListingType) => {
+    setSelectedListingType(type);
+    closeCategories();
+  };
+
+  const applyDrawerDepartment = (kind: "year" | "branch", value: string) => {
+    if (kind === "year") {
+      setSelectedYear(value);
+    } else {
+      setSelectedBranch(value);
+    }
+    closeCategories();
+  };
+
+  const goToHandoffZones = () => {
+    closeCategories();
+    window.setTimeout(() => {
+      document.getElementById("handoff-zones")?.scrollIntoView({ behavior: "smooth" });
+    }, 250);
+  };
+
+  const openLostAndFound = () => {
+    closeCategories();
+    showToast("Lost & Found Vault is coming soon to MET Campus Hub.");
+  };
+
+  const openAiVaultFromDrawer = () => {
+    closeCategories();
+    setIsAiVaultOpen(true);
+  };
+
+  const openTermsFromDrawer = () => {
+    closeCategories();
+    openTerms();
+  };
 
   const persistUser = (user: { name: string; prn: string; email: string; branch: string; phone: string }) => {
     setCurrentUser(user);
@@ -695,10 +807,11 @@ export default function METCampusHubFullPage() {
     const matchesBranch = selectedBranch === "All Branches" || item.department === selectedBranch;
     const matchesYear = selectedYear === "All Years" || item.year === selectedYear;
     const matchesCategory = selectedCategory === "All Gear" || item.category === selectedCategory;
+    const matchesType = selectedListingType === "All" || item.listingType === selectedListingType;
     const matchesSearch =
       item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.sellerName.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesBranch && matchesYear && matchesCategory && matchesSearch;
+    return matchesBranch && matchesYear && matchesCategory && matchesType && matchesSearch;
   });
 
   return (
@@ -712,6 +825,14 @@ export default function METCampusHubFullPage() {
       <header className="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsCategoriesOpen(true)}
+              className="inline-flex items-center gap-1.5 border border-slate-300 hover:bg-slate-100 text-slate-800 font-semibold text-sm px-3 py-2 rounded-lg transition"
+              aria-label="Open categories menu"
+            >
+              <span className="text-base leading-none">☰</span>
+              <span className="hidden sm:inline">Categories</span>
+            </button>
             <a href="#" className="flex items-center gap-2">
               <div className="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center text-white font-black text-lg shadow-sm">
                 M
@@ -739,7 +860,7 @@ export default function METCampusHubFullPage() {
               <span>SPPU AI Vault</span>
             </button>
             <button
-              onClick={() => setIsTermsOpen(true)}
+              onClick={openTerms}
               className="hover:text-emerald-600 transition-colors flex items-center gap-1.5"
             >
               <FileText className="w-4 h-4" />
@@ -1660,12 +1781,141 @@ export default function METCampusHubFullPage() {
         </div>
       )}
 
-      {/* 9. TERMS & USAGE POLICY MODAL */}
-      {isTermsOpen && (
+      {/* 8B. CATEGORIES SIDEBAR DRAWER */}
+      <div className={`fixed inset-0 z-[55] ${isCategoriesOpen ? "" : "pointer-events-none"}`} aria-hidden={!isCategoriesOpen}>
+        <div
+          onClick={closeCategories}
+          className={`absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300 ${
+            isCategoriesOpen ? "opacity-100" : "opacity-0"
+          }`}
+        />
+        <aside
+          className={`absolute top-0 left-0 h-full w-80 max-w-[85vw] bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-out ${
+            isCategoriesOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+          role="dialog"
+          aria-label="Categories navigation"
+        >
+          <div className="bg-slate-900 text-white px-5 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-black text-sm">
+                M
+              </div>
+              <span className="font-bold text-base">
+                Hello, {currentUser?.name || "Student"}
+              </span>
+            </div>
+            <button
+              onClick={closeCategories}
+              className="text-slate-300 hover:text-white p-1"
+              aria-label="Close categories menu"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-2 py-3">
+            <div className="px-3 py-2">
+              <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                Browse Academic Categories
+              </h3>
+            </div>
+            {DRAWER_CATEGORIES.map((cat) => (
+              <button
+                key={cat.value}
+                onClick={() => applyDrawerCategory(cat.value)}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition text-left"
+              >
+                <span className="text-base">{cat.emoji}</span>
+                <span>{cat.label}</span>
+              </button>
+            ))}
+
+            <div className="my-3 border-t border-slate-100" />
+
+            <div className="px-3 py-2">
+              <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                Filter by Listing Type
+              </h3>
+            </div>
+            {DRAWER_LISTING_TYPES.map((t) => (
+              <button
+                key={t.value}
+                onClick={() => applyDrawerListingType(t.value)}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition text-left"
+              >
+                <span className="text-base">{t.emoji}</span>
+                <span>{t.label}</span>
+              </button>
+            ))}
+
+            <div className="my-3 border-t border-slate-100" />
+
+            <div className="px-3 py-2">
+              <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                Filter by Department
+              </h3>
+            </div>
+            {DRAWER_DEPARTMENTS.map((dept) => (
+              <button
+                key={dept.label}
+                onClick={() => applyDrawerDepartment(dept.kind, dept.value)}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition text-left"
+              >
+                <Building2 className="w-4 h-4 text-slate-400" />
+                <span>{dept.label}</span>
+              </button>
+            ))}
+
+            <div className="my-3 border-t border-slate-100" />
+
+            <div className="px-3 py-2">
+              <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                Campus Hub Features
+              </h3>
+            </div>
+            <button
+              onClick={openAiVaultFromDrawer}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition text-left"
+            >
+              <span className="text-base">🤖</span>
+              <span>SPPU AI Study Vault Assistant</span>
+            </button>
+            <button
+              onClick={openLostAndFound}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition text-left"
+            >
+              <span className="text-base">🔍</span>
+              <span>Lost &amp; Found Vault</span>
+            </button>
+            <button
+              onClick={goToHandoffZones}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition text-left"
+            >
+              <span className="text-base">📍</span>
+              <span>Campus Handoff Zones</span>
+            </button>
+            <button
+              onClick={openTermsFromDrawer}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition text-left"
+            >
+              <span className="text-base">📜</span>
+              <span>Terms &amp; Rental Liability Policy</span>
+            </button>
+          </div>
+
+          <div className="border-t border-slate-100 px-5 py-3 text-[11px] text-slate-400">
+            MET BKC IOE, Nashik &bull; Verified student marketplace
+          </div>
+        </aside>
+      </div>
+
+      {/* 9. TERMS & USAGE POLICY MODAL (MANUAL + FIRST-VISIT POPUP) */}
+      {(isTermsOpen || showTermsOnArrival) && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-6 shadow-2xl relative border border-slate-200">
             <button
-              onClick={() => setIsTermsOpen(false)}
+              onClick={() => { setShowTermsOnArrival(false); setIsTermsOpen(false); }}
               className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1"
             >
               <X className="w-5 h-5" />
@@ -1673,56 +1923,60 @@ export default function METCampusHubFullPage() {
 
             <div className="flex items-center gap-2 mb-1">
               <ShieldCheck className="w-5 h-5 text-emerald-600" />
-              <h3 className="text-xl font-bold text-slate-900">Terms &amp; Usage Policy</h3>
+              <h3 className="text-lg sm:text-xl font-bold text-slate-900 pr-8">
+                Welcome to MET Campus Hub &bull; Campus Guidelines &amp; Safety Policy
+              </h3>
             </div>
             <p className="text-xs text-slate-500 mb-5">
-              MET Campus Hub • MET BKC Institute of Engineering, Nashik
+              Official Student-to-Student Peer Marketplace for MET BKC IOE, Nashik.
             </p>
 
-            <div className="space-y-4">
-              <section>
-                <h4 className="font-bold text-slate-900 text-sm mb-1">1. Student Identity</h4>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  MET Campus Hub is an exclusive campus marketplace for verified MET BKC students. All sellers
-                  and buyers must be currently enrolled students of MET BKC IOE, Nashik. Accounts are subject
-                  to campus identity verification, and non-student access is not permitted.
-                </p>
-              </section>
-
-              <section>
-                <h4 className="font-bold text-slate-900 text-sm mb-1">2. Damaged Item Policy</h4>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  If gear is damaged during a rental, handoff, or inspection window, the borrower or buyer is
-                  liable for up to 80% of the replacement cost. Damage must be reported on campus to the owner
-                  and the moderation team within 24 hours of handoff.
-                </p>
-              </section>
-
-              <section>
-                <h4 className="font-bold text-slate-900 text-sm mb-1">3. Lost Item Policy</h4>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  If a rented or reserved item is lost while in the borrower&apos;s custody, the borrower must
-                  reimburse 100% of the replacement cost to the item owner before the transaction is closed.
-                </p>
-              </section>
-
-              <section>
-                <h4 className="font-bold text-slate-900 text-sm mb-1">4. Direct Handoff Disclaimer</h4>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  All transactions occur directly between students on campus grounds. MET Campus Hub charges 0%
-                  platform fee and 0% brokerage, and is not a party to any agreement between buyers and sellers.
-                  Students are encouraged to inspect items and complete handoffs at safe campus locations such as
-                  the Main Canteen or Library.
-                </p>
-              </section>
+            <div className="space-y-3">
+              {TERMS_HIGHLIGHTS.map((item) => (
+                <div
+                  key={item.title}
+                  className="flex items-start gap-3 bg-slate-50 border border-slate-200 rounded-xl p-3.5"
+                >
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-sm mb-0.5">{item.title}</h4>
+                    <p className="text-xs text-slate-600 leading-relaxed">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
             </div>
 
-            <button
-              onClick={() => setIsTermsOpen(false)}
-              className="mt-6 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg text-sm transition"
-            >
-              I Understand
-            </button>
+            {showTermsOnArrival ? (
+              <div className="mt-6 border-t border-slate-100 pt-4">
+                <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-700 leading-relaxed">
+                  <input
+                    type="checkbox"
+                    checked={termsAgreed}
+                    onChange={(e) => setTermsAgreed(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-emerald-600 shrink-0"
+                  />
+                  <span>
+                    I agree to the MET Campus Hub Terms of Service, Rental Liability Policy, and
+                    Campus Safety Rules.
+                  </span>
+                </label>
+
+                <button
+                  onClick={acceptTerms}
+                  disabled={!termsAgreed}
+                  className="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-lg text-sm transition"
+                >
+                  I Accept &amp; Continue to Hub
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setIsTermsOpen(false)}
+                className="mt-6 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg text-sm transition"
+              >
+                I Understand
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -1803,7 +2057,7 @@ export default function METCampusHubFullPage() {
 
           <div className="flex items-center gap-5">
             <button
-              onClick={() => setIsTermsOpen(true)}
+              onClick={openTerms}
               className="hover:text-white transition flex items-center gap-1.5"
             >
               <FileText className="w-3.5 h-3.5" />
