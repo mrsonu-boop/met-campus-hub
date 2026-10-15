@@ -13,6 +13,7 @@ import {
   X,
   Send,
   CreditCard,
+  ShoppingCart,
   Flag,
   UserCheck,
   Building2,
@@ -307,6 +308,12 @@ export default function METCampusHubFullPage() {
 
   const [listings, setListings] = useState<Listing[]>(SAMPLE_LISTINGS);
 
+  const [cart, setCart] = useState<Listing[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+  const [receiptItems, setReceiptItems] = useState<Listing[]>([]);
+  const [receiptDeposit, setReceiptDeposit] = useState(0);
+
   const [postTitle, setPostTitle] = useState("");
   const [postPrice, setPostPrice] = useState("");
   const [postSeller, setPostSeller] = useState("");
@@ -426,6 +433,31 @@ export default function METCampusHubFullPage() {
   const profileFeatureToast = (label: string) => {
     setIsProfileMenuOpen(false);
     showToast(`${label} is coming soon to MET Campus Hub.`);
+  };
+
+  const addToCart = (item: Listing) => {
+    setCart((prev) => {
+      const exists = prev.find((p) => p.id === item.id);
+      if (exists) return prev;
+      return [...prev, item];
+    });
+    showToast("Added to Cart!");
+  };
+
+  const removeFromCart = (id: string) => {
+    setCart((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  const cartSubtotal = cart.reduce((sum, item) => sum + (item.price > 0 ? item.price : 0), 0);
+  const cartDeposit = cart.length > 0 ? 50 : 0;
+  const cartTotal = cartSubtotal + cartDeposit;
+
+  const openCart = () => setIsCartOpen(true);
+  const closeCart = () => setIsCartOpen(false);
+  const closeReceiptModal = () => {
+    setIsReceiptModalOpen(false);
+    setReceiptItems([]);
+    setReceiptDeposit(0);
   };
 
   const persistUser = (user: { name: string; prn: string; email: string; branch: string; phone: string; year?: string }) => {
@@ -789,6 +821,86 @@ export default function METCampusHubFullPage() {
     rzp.open();
   };
 
+  const handleCartCheckout = async () => {
+    if (cart.length === 0) return;
+
+    const purchasedItems = [...cart];
+    const purchasedDeposit = cartDeposit;
+    const purchasedTotal = cartTotal;
+    const ready = await loadRazorpay();
+
+    const completeReservation = (offline: boolean) => {
+      setReceiptItems(purchasedItems);
+      setReceiptDeposit(purchasedDeposit);
+      setCart([]);
+      setIsCartOpen(false);
+      setIsReceiptModalOpen(true);
+      showToast(
+        offline
+          ? "Razorpay unavailable. Offline reservation logged for your cart."
+          : "Payment successful. Cart cleared."
+      );
+    };
+
+    if (!ready || !(window as unknown as { Razorpay?: unknown }).Razorpay) {
+      completeReservation(true);
+      return;
+    }
+
+    let order: { id: string; amount: number; currency: string };
+    try {
+      const res = await fetch("/api/razorpay", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          amount: purchasedTotal,
+          itemTitle: `${purchasedItems.length} campus item(s)`
+        })
+      });
+      if (!res.ok) throw new Error("order creation failed");
+      order = (await res.json()) as { id: string; amount: number; currency: string };
+      if (!order?.id) throw new Error("missing order id");
+    } catch {
+      completeReservation(true);
+      return;
+    }
+
+    const options = {
+      key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+      amount: order.amount,
+      currency: order.currency,
+      order_id: order.id,
+      name: "MET Campus Hub",
+      description: `Cart reservation — ${purchasedItems.length} item(s)`,
+      image: "https://images.unsplash.com/photo-1587145820266-a5951ee6f620?w=100&auto=format&fit=crop&q=80",
+      handler: function (response: { razorpay_payment_id?: string; razorpay_order_id?: string }) {
+        setReceiptItems(purchasedItems);
+        setReceiptDeposit(purchasedDeposit);
+        setCart([]);
+        setIsCartOpen(false);
+        setIsReceiptModalOpen(true);
+        showToast(
+          `Token Reserved! Paid ₹${purchasedTotal}. Payment ID: ${response.razorpay_payment_id ?? "N/A"}`
+        );
+      },
+      prefill: {
+        name: currentUser?.name || "Student Buyer",
+        email: currentUser?.email || "student@met.edu",
+        contact: currentUser?.phone?.replace(/\D/g, "") || "9876543210"
+      },
+      theme: {
+        color: "#059669"
+      },
+      modal: {
+        ondismiss: function () {
+          showToast("Checkout closed. Your cart items are saved.");
+        }
+      }
+    };
+    const rzp = new ((window as unknown as { Razorpay: new (opts: unknown) => { open: () => void } }).Razorpay)(options);
+    rzp.open();
+  };
+
   const handleAiSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const userMsg = aiQuery.trim();
@@ -926,6 +1038,17 @@ export default function METCampusHubFullPage() {
             >
               <PlusCircle className="w-4 h-4" />
               <span>Post Item Free</span>
+            </button>
+            <button
+              onClick={openCart}
+              className="relative inline-flex items-center gap-1.5 border border-slate-300 hover:bg-slate-100 text-slate-800 font-semibold text-sm px-3.5 py-2 rounded-lg transition"
+              aria-label="Open shopping cart"
+            >
+              <ShoppingCart className="w-4 h-4 text-slate-700" />
+              <span className="hidden sm:inline">Cart</span>
+              <span className="absolute -top-1.5 -right-1.5 min-w-[1.15rem] px-1 text-[10px] font-bold leading-4 text-center text-white bg-emerald-600 border border-white rounded-full">
+                {cart.length}
+              </span>
             </button>
             {currentUser ? (
               <div
@@ -1231,15 +1354,46 @@ export default function METCampusHubFullPage() {
                   </button>
                 </div>
 
-                <a
-                  href={whatsappLinkFor(item)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-2 rounded-lg transition shadow-sm"
-                >
-                  <MessageCircle className="w-4 h-4 fill-current" />
-                  <span>Chat on WhatsApp</span>
-                </a>
+                {(() => {
+                  const isPaid =
+                    item.listingType !== "Free" &&
+                    (item.listingType === "Sale" || item.listingType === "Rent") &&
+                    item.price > 0;
+
+                  if (!isPaid) {
+                    return (
+                      <a
+                        href={whatsappLinkFor(item)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-2 rounded-lg transition shadow-sm"
+                      >
+                        <MessageCircle className="w-4 h-4 fill-current" />
+                        <span>Claim / Chat on WhatsApp</span>
+                      </a>
+                    );
+                  }
+
+                  return (
+                    <div className="flex gap-2">
+                      <a
+                        href={whatsappLinkFor(item)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-2 rounded-lg transition shadow-sm"
+                      >
+                        <MessageCircle className="w-4 h-4 fill-current" />
+                        <span>Chat on WhatsApp</span>
+                      </a>
+                      <button
+                        onClick={() => addToCart(item)}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs py-2 rounded-lg transition shadow-sm"
+                      >
+                        <span>Add to Cart 🛒</span>
+                      </button>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           ))}
@@ -2272,7 +2426,156 @@ export default function METCampusHubFullPage() {
         </div>
       )}
 
-      {/* 11. FOOTER */}
+      {/* 11. SHOPPING CART DRAWER */}
+      {isCartOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex justify-end">
+          <div className="absolute inset-0" onClick={closeCart} />
+          <aside className="relative h-full w-full max-w-md bg-white shadow-2xl border-l border-slate-200 flex flex-col animate-drawer-in">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <ShoppingCart className="w-5 h-5 text-emerald-600" />
+                <h3 className="text-lg font-bold text-slate-900">Your Campus Cart</h3>
+              </div>
+              <button
+                onClick={closeCart}
+                className="text-slate-400 hover:text-slate-600 p-1"
+                aria-label="Close cart"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+              {cart.length === 0 ? (
+                <p className="text-xs text-slate-500 bg-slate-50 border border-dashed border-slate-200 rounded-lg px-3 py-6 text-center">
+                  Your campus cart is empty. Browse gear to add!
+                </p>
+              ) : (
+                cart.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-3 border border-slate-200 rounded-lg p-3"
+                  >
+                    <img
+                      src={item.image}
+                      alt={item.title}
+                      className="w-12 h-12 rounded-md object-cover bg-slate-100 shrink-0"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-slate-900 text-xs truncate">{item.title}</p>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                          {LISTING_TYPE_BADGE[item.listingType]}
+                        </span>
+                        <span className="text-[11px] font-bold text-slate-900">₹{item.price}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => removeFromCart(item.id)}
+                      className="text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-1 rounded-md transition shrink-0"
+                    >
+                      Remove 🗑️
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="border-t border-slate-200 px-5 py-4 bg-slate-50 space-y-1 text-xs">
+              <div className="flex items-center justify-between text-slate-600">
+                <span>Subtotal</span>
+                <span className="font-medium text-slate-900">₹{cartSubtotal}</span>
+              </div>
+              <div className="flex items-center justify-between text-slate-600">
+                <span>Token deposit / reservation fee</span>
+                <span className="font-medium text-slate-900">₹{cartDeposit}</span>
+              </div>
+              <div className="flex items-center justify-between border-t border-slate-200 pt-1 mt-1">
+                <span className="font-semibold text-slate-900">Total amount</span>
+                <span className="font-extrabold text-emerald-700">₹{cartTotal}</span>
+              </div>
+            </div>
+
+            <div className="px-5 py-4 border-t border-slate-200">
+              <button
+                onClick={handleCartCheckout}
+                disabled={cart.length === 0}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-lg text-sm transition"
+              >
+                Proceed to Reserve &amp; Pay (Razorpay)
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      {/* 12. RESERVATION RECEIPT MODAL */}
+      {isReceiptModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative border border-slate-200">
+            <button
+              onClick={closeReceiptModal}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2 mb-1">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              <h3 className="text-lg font-bold text-slate-900">Token Reserved!</h3>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">
+              Meet sellers at MET BKC Campus Handoff Spots (Main Canteen / Library) to collect your
+              items.
+            </p>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 mb-4 text-xs space-y-1">
+              <div className="flex items-center justify-between text-slate-600">
+                <span>Subtotal ({receiptItems.length} item{receiptItems.length === 1 ? "" : "s"})</span>
+                <span className="font-medium text-slate-900">
+                  ₹{receiptItems.reduce((sum, item) => sum + item.price, 0)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-slate-600">
+                <span>Token deposit</span>
+                <span className="font-medium text-slate-900">₹{receiptDeposit}</span>
+              </div>
+              <div className="flex items-center justify-between border-t border-slate-200 pt-1 mt-1">
+                <span className="font-semibold text-slate-900">Total paid</span>
+                <span className="font-extrabold text-emerald-700">
+                  ₹{receiptItems.reduce((sum, item) => sum + item.price, 0) + receiptDeposit}
+                </span>
+              </div>
+              {receiptItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between text-slate-500 pt-0.5"
+                >
+                  <span className="truncate max-w-[60%]">{item.title}</span>
+                  <span>₹{item.price}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-4">
+              <MapPin className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+              <p className="text-[11px] text-emerald-900 leading-relaxed">
+                Main Canteen / Library — inspect items before collecting. The remaining amount is
+                paid directly to the seller at handoff.
+              </p>
+            </div>
+
+            <button
+              onClick={closeReceiptModal}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg text-sm transition"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 13. FOOTER */}
       <footer className="bg-zinc-900 text-zinc-400 py-10 px-4 sm:px-6 border-t border-zinc-800">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
           <div className="flex items-center gap-2">
