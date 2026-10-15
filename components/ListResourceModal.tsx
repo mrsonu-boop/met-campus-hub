@@ -119,7 +119,7 @@ export function ListResourceModal({ open, onClose, onSubmit }: ListResourceModal
         aria-hidden
       />
 
-      <div className="relative max-h-[92dvh] w-full max-w-lg animate-scale-in overflow-y-auto rounded-t-3xl border border-line/80 bg-white/90 shadow-2xl shadow-black/50 backdrop-blur-md dark:bg-[#171411]/90 scroll-thin sm:rounded-3xl">
+      <div className="relative max-h-[92dvh] w-full max-w-lg animate-scale-in overflow-y-auto rounded-t-2xl border border-line bg-surface shadow-2xl shadow-black/60 scroll-thin sm:rounded-2xl">
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-line bg-surface/95 px-5 py-4 backdrop-blur">
           <div className="flex items-start gap-3">
@@ -207,7 +207,7 @@ export function ListResourceModal({ open, onClose, onSubmit }: ListResourceModal
                     className={`rounded-lg border px-2 py-2 text-xs font-medium transition ${
                       active
                         ? option === "sale"
-                          ? "border-indigo-500/40 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300"
+                          ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
                           : "border-brand/40 bg-emerald-500/10 text-brand"
                         : "border-line bg-sunken text-muted hover:border-line-strong hover:text-fg"
                     }`}

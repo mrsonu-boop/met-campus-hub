@@ -56,7 +56,7 @@ export interface NoteSet {
   courseCode: string;
   branch: Branch;
   semester: string;
-  accent: "emerald" | "indigo" | "amber" | "sky" | "rose" | "violet";
+  accent: "emerald" | "teal" | "amber" | "rose";
   description: string;
   downloads: number;
   units: NoteUnit[];

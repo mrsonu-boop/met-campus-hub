@@ -6,7 +6,6 @@
 @theme {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, monospace;
-  --font-display: var(--font-fraunces), "Georgia", ui-serif, serif;
 
   --animate-fade-up: fade-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-fade-in: fade-in 0.3s ease-out both;
@@ -16,7 +15,7 @@
   --animate-ping-slow: ping-slow 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
   --animate-shake: shake 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 
-  --radius-card: 1.5rem;
+  --radius-card: 0.875rem;
 }
 
 /*
@@ -41,52 +40,49 @@
 }
 
 :root {
-  /* Light — warm cream "milky" glass: #FBFBF9 canvas, white frosted cards,
-     peach + mint pastel glows. Readable warm neutrals throughout. */
+  /* Light — crisp white cards on slate-50 canvas. Flat, high-contrast. */
   color-scheme: light;
 
-  --canvas: #fbfbf9;
+  --canvas: #f8fafc;
   --surface: #ffffff;
-  --elevated: #f6f3ec;
-  --sunken: #f7f4ed;
-  --line: #ece7de;
-  --line-strong: #d9d3c6;
-  --fg: #1c1917;
-  --muted: #78716c;
-  --faint: #a8a197;
-  --brand: #0d7a6b;
+  --elevated: #f1f5f9;
+  --sunken: #f6f8fb;
+  --line: #e2e8f0;
+  --line-strong: #cbd5e1;
+  --fg: #0f172a;
+  --muted: #64748b;
+  --faint: #94a3b8;
+  --brand: #059669;
   --on-brand: #ffffff;
-  --grid: #a8a197;
+  --grid: #64748b;
 
-  --shadow-card:
-    0 1px 2px 0 rgb(28 25 23 / 0.04),
-    0 1px 3px 0 rgb(28 25 23 / 0.03);
-  --shadow-lift: 0 20px 44px -20px rgb(28 25 23 / 0.2);
-  --glass-bg: rgb(255 255 255 / 0.8);
-  --glass-border: rgb(236 231 222 / 0.9);
+  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.05);
+  --shadow-lift: 0 12px 32px -14px rgb(15 23 42 / 0.18);
+  --glass-bg: #ffffff;
+  --glass-border: #e2e8f0;
 }
 
 .dark {
-  /* Dark — softened warm-obsidian so the glassmorphism stays readable. */
+  /* Dark — deep obsidian canvas, zinc card fills, crisp subtle borders. */
   color-scheme: dark;
 
-  --canvas: #0c0a08;
-  --surface: #171411;
-  --elevated: #201c18;
-  --sunken: #110f0c;
-  --line: #2b2620;
-  --line-strong: #443c32;
-  --fg: #f7f5f2;
-  --muted: #b5aca1;
-  --faint: #82786b;
-  --brand: #4ade80;
-  --on-brand: #0c1a12;
-  --grid: #6b6255;
+  --canvas: #09090b;
+  --surface: #18181b;
+  --elevated: #1f1f23;
+  --sunken: #0f0f12;
+  --line: #27272a;
+  --line-strong: #3f3f46;
+  --fg: #fafafa;
+  --muted: #a1a1aa;
+  --faint: #71717a;
+  --brand: #34d399;
+  --on-brand: #052e20;
+  --grid: #52525b;
 
   --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.4);
-  --shadow-lift: 0 20px 44px -24px rgb(0 0 0 / 0.9);
-  --glass-bg: rgb(23 20 17 / 0.72);
-  --glass-border: rgb(43 38 32 / 0.9);
+  --shadow-lift: 0 18px 40px -24px rgb(0 0 0 / 0.9);
+  --glass-bg: #18181b;
+  --glass-border: #27272a;
 }
 
 @keyframes fade-up {
@@ -187,15 +183,6 @@
     -webkit-font-smoothing: antialiased;
   }
 
-  /* Elegant serif display type for headings, paired with the sans body. */
-  h1,
-  h2,
-  h3,
-  h4 {
-    font-family: var(--font-display);
-    letter-spacing: -0.01em;
-  }
-
   ::selection {
     background-color: color-mix(in oklab, var(--brand) 26%, transparent);
     color: var(--fg);
@@ -224,63 +211,57 @@
 }
 
 @layer components {
-  /* Frosted white glassmorphism card — the core surface of the app. */
+  /* Crisp flat card — the core surface of the app. */
   .card {
     position: relative;
     border-radius: var(--radius-card);
     border: 1px solid var(--glass-border);
     background-color: var(--glass-bg);
-    -webkit-backdrop-filter: blur(20px) saturate(160%);
-    backdrop-filter: blur(20px) saturate(160%);
     box-shadow: var(--shadow-card);
     transition-property: border-color, background-color, transform, box-shadow;
     transition-duration: 220ms;
     transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  /* 1px border light glow + lift on hover. */
+  /* Border emphasis + lift on hover. */
   .card-hover:hover {
-    border-color: color-mix(in oklab, var(--brand) 35%, var(--line-strong));
-    transform: translateY(-3px);
+    border-color: color-mix(in oklab, var(--brand) 38%, var(--line-strong));
+    transform: translateY(-2px);
     box-shadow: var(--shadow-lift);
   }
 
   /* Crisp opaque variant for panels that must not show the grid through. */
   .panel {
-    border-radius: 1.25rem;
+    border-radius: 0.75rem;
     border: 1px solid var(--line);
     background-color: var(--surface);
     box-shadow: var(--shadow-card);
   }
 
-  /* Glossy black primary pill button. */
+  /* Solid emerald primary button. */
   .btn-primary {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    border-radius: 9999px;
-    border: 1px solid rgb(255 255 255 / 0.08);
-    background-image: linear-gradient(180deg, #262626 0%, #0a0a0a 100%);
-    color: #ffffff;
-    padding-block: 0.75rem;
-    padding-inline: 1.5rem;
+    border-radius: 0.625rem;
+    border: 1px solid transparent;
+    background-color: var(--brand);
+    color: var(--on-brand);
+    padding-block: 0.625rem;
+    padding-inline: 1rem;
     font-size: 0.875rem;
-    font-weight: 500;
+    font-weight: 600;
     line-height: 1.25rem;
-    box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.12),
-      0 10px 24px -10px rgb(0 0 0 / 0.45);
     transition:
-      background-image 180ms,
+      background-color 180ms,
       transform 180ms,
-      box-shadow 180ms,
       opacity 180ms;
     cursor: pointer;
   }
 
   .btn-primary:hover:not(:disabled) {
-    background-image: linear-gradient(180deg, #333333 0%, #101010 100%);
+    background-color: #047857;
     transform: translateY(-1px);
   }
 
@@ -291,15 +272,15 @@
 
   .btn-primary:disabled {
     cursor: not-allowed;
-    opacity: 0.4;
+    opacity: 0.5;
   }
 
-  /* High-contrast pill badge. */
+  /* High-contrast status chip. */
   .pill {
     display: inline-flex;
     align-items: center;
     gap: 0.375rem;
-    border-radius: 9999px;
+    border-radius: 0.375rem;
     border: 1px solid var(--line);
     background-color: var(--elevated);
     padding-inline: 0.5rem;
@@ -352,12 +333,6 @@
   .glow-emerald {
     box-shadow:
       0 0 0 1px color-mix(in oklab, var(--brand) 22%, transparent),
-      0 6px 18px -10px rgb(0 0 0 / 0.25);
-  }
-
-  .glow-indigo {
-    box-shadow:
-      0 0 0 1px rgb(129 140 248 / 0.22),
       0 6px 18px -10px rgb(0 0 0 / 0.25);
   }
 

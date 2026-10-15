@@ -20,6 +20,18 @@ export const CATEGORIES: (GearCategory | "All Items")[] = [
   "Lab Coats",
 ];
 
+/**
+ * Marketplace filter chips, presented with shopper-friendly labels while still
+ * filtering on the underlying {@link GearCategory} values.
+ */
+export const CATEGORY_FILTERS: { value: GearCategory | "All Items"; label: string }[] = [
+  { value: "All Items", label: "All Gear" },
+  { value: "Calculators", label: "Calculators" },
+  { value: "Drawing Drafters", label: "Drafters & Kits" },
+  { value: "Textbooks", label: "SPPU Textbooks" },
+  { value: "Lab Coats", label: "Hostel Gear" },
+];
+
 export const TYPE_FILTERS: ("All" | ListingType)[] = ["All", "rent", "sale", "donate"];
 
 export const LISTING_TYPE_LABEL: Record<ListingType, string> = {
@@ -350,7 +362,7 @@ export const NOTE_SETS: NoteSet[] = [
     courseCode: "COMP3121",
     branch: "Computer",
     semester: "TE",
-    accent: "sky",
+    accent: "teal",
     description:
       "Wave optics, semiconductors and electromagnetic theory summarised with numericals straight from the SPPU paper pattern.",
     downloads: 1680,
@@ -396,7 +408,7 @@ export const NOTE_SETS: NoteSet[] = [
     courseCode: "IT3141",
     branch: "IT",
     semester: "TE",
-    accent: "indigo",
+    accent: "emerald",
     description:
       "Scheduling, synchronisation, deadlock and memory management with previous-year question sets at the end of every unit.",
     downloads: 1395,
@@ -442,7 +454,7 @@ export const NOTE_SETS: NoteSet[] = [
     courseCode: "COMP3142",
     branch: "Computer",
     semester: "BE",
-    accent: "violet",
+    accent: "rose",
     description:
       "Lexical analysis, parsers, linker design and code-generation topics from the final-year SPPU syllabus.",
     downloads: 980,

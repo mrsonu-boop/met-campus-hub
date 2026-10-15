@@ -5,12 +5,18 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 // Models are attempted in order. Each string is the raw model name (no
-// `models/` prefix — the SDK adds it when calling the API). Fastest first.
+// `models/` prefix — the SDK adds it when calling the API). Ordering favors the
+// flash tiers that are consistently healthy; newer tiers can be quota- or
+// capacity-limited (429/503) but still act as fallbacks, and the deprecated
+// 2.5 tier is a last resort. 503 capacity spikes are retried a couple times
+// with backoff before moving on; 429/404 fail over immediately.
 const MODEL_CANDIDATES = [
-  'gemini-2.5-flash',
-  'gemini-1.5-flash',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash',
   'gemini-3.8-flash',
-  'gemini-1.5-pro',
+  'gemini-3.7-flash',
+  'gemini-2.5-flash',
+  'gemini-omni-1.1-flash',
 ] as const;
 
 let client: GoogleGenAI | null = null;
@@ -79,15 +85,20 @@ async function openFirstGenerator(
       };
 
       if (isServiceUnavailable(firstError)) {
-        console.warn(`Gemini model "${model}" returned 503, retrying once in 1 second...`);
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        try {
-          return { generator: await generate(), failures };
-        } catch (retryError: unknown) {
-          failure.message = errorMessage(retryError, 'unknown error');
-          failure.status = errorStatus(retryError);
-          failure.retried = true;
+        console.warn(`Gemini model "${model}" returned 503, one quick retry...`);
+        const delaysMs = [500];
+        let lastError: unknown = firstError;
+        for (const delayMs of delaysMs) {
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+          try {
+            return { generator: await generate(), failures };
+          } catch (retryError: unknown) {
+            lastError = retryError;
+          }
         }
+        failure.message = errorMessage(lastError, 'unknown error');
+        failure.status = errorStatus(lastError);
+        failure.retried = true;
       } else {
         console.warn(`Gemini model "${model}" failed: ${failure.message}`);
       }
@@ -147,7 +158,7 @@ export async function POST(req: Request) {
         }
       } catch (error: unknown) {
         console.error('Gemini stream interrupted:', error);
-        enqueue(`\n[AI_ERROR]: ${errorMessage(error, 'The stream was interrupted')}`);
+        enqueue('\n[AI_ERROR]: The connection dropped before the answer finished. Please try again.');
       } finally {
         try {
           controller.close();

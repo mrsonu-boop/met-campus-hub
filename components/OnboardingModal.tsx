@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { HelpCircle, MessageCircle, ShoppingBag, Sparkles, X } from "lucide-react";
+import { HelpCircle, MapPin, MessageCircle, ShoppingBag, X } from "lucide-react";
 
 interface OnboardingModalProps {
   open: boolean;
@@ -11,18 +11,18 @@ interface OnboardingModalProps {
 const STEPS = [
   {
     icon: ShoppingBag,
-    title: "Browse or list campus gear",
+    title: "Browse gear and notes",
     body: "Rent, sell or donate calculators, textbooks, drafter sets and lab coats. Publishing a listing takes under a minute.",
   },
   {
     icon: MessageCircle,
-    title: "Meet on campus, pay your way",
-    body: "Chat over WhatsApp, check the seller is a student, and settle with UPI or cash at spots like the canteen or library.",
+    title: "Connect on WhatsApp",
+    body: "Message the other student directly. No listing fees, no commissions and no middleman.",
   },
   {
-    icon: Sparkles,
-    title: "Ask the AI study assistant",
-    body: "Download SPPU-aligned notes from the Knowledge Vault, or ask the AI drawer to explain any single unit in plain words.",
+    icon: MapPin,
+    title: "Hand off on campus",
+    body: "Meet at the canteen or library, confirm the handoff with a QR + PIN, and ask the AI vault to explain any SPPU unit.",
   },
 ];
 
@@ -58,17 +58,19 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
         aria-hidden
       />
 
-      <div className="relative w-full max-w-md animate-scale-in overflow-hidden rounded-t-3xl border border-line/80 bg-white/85 shadow-[0_24px_60px_-24px_rgb(28_25_23/0.35)] backdrop-blur-md dark:bg-[#171411]/85 sm:rounded-3xl">
-        <div className="flex items-start justify-between gap-3 border-b border-line bg-white/50 px-5 py-4 dark:bg-white/[0.03]">
+      <div className="relative w-full max-w-md animate-scale-in overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl shadow-black/60">
+        <div className="flex items-start justify-between gap-3 border-b border-line bg-sunken/60 px-5 py-4">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-emerald-500/10">
               <HelpCircle className="h-5 w-5 text-brand" />
             </div>
             <div>
               <h2 id="onboarding-title" className="text-sm font-semibold tracking-tight text-fg">
-                How MET Campus Hub works
+                Welcome to MET Campus Hub
               </h2>
-              <p className="mt-0.5 text-xs text-muted">Three ways to use it, all on campus</p>
+              <p className="mt-0.5 text-xs text-muted">
+                The zero-fee exchange for MET BKC IOE
+              </p>
             </div>
           </div>
           <button
@@ -80,6 +82,12 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
           >
             <X className="h-4 w-4" />
           </button>
+        </div>
+
+        <div className="border-b border-line bg-brand/[0.06] px-5 py-2.5">
+          <p className="text-xs font-medium text-brand">
+            No listing fees, no commissions. Just your batch passing things forward.
+          </p>
         </div>
 
         <div className="space-y-3 p-5">
@@ -108,7 +116,7 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
             onClick={onClose}
             className="btn-primary w-full"
           >
-            Got it — let&apos;s go
+            Got it, let&apos;s go
           </button>
           <p className="mt-2 text-center text-[11px] text-faint">
             You can open this again anytime from &ldquo;How to Use&rdquo; in the top bar.

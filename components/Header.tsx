@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ChevronDown,
@@ -9,8 +9,7 @@ import {
   HelpCircle,
   LogOut,
   Plus,
-  Search,
-  X,
+  ShieldCheck,
 } from "lucide-react";
 
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -19,14 +18,11 @@ import { BRANCHES, YEARS } from "@/lib/data";
 import type { Branch, Year } from "@/lib/types";
 
 interface HeaderProps {
-  search: string;
-  onSearchChange: (value: string) => void;
   branch: Branch | "All";
   onBranchChange: (value: Branch | "All") => void;
   year: Year | "All";
   onYearChange: (value: Year | "All") => void;
   onListResource: () => void;
-  onFocusSearch: () => void;
   onSignIn: () => void;
   onHowToUse: () => void;
 }
@@ -35,41 +31,32 @@ const SELECT_CLASS =
   "input h-9 cursor-pointer appearance-none py-0 pr-8";
 
 export function Header({
-  search,
-  onSearchChange,
   branch,
   onBranchChange,
   year,
   onYearChange,
   onListResource,
-  onFocusSearch,
   onSignIn,
   onHowToUse,
 }: HeaderProps) {
-  const searchRef = useRef<HTMLInputElement>(null);
   const { user, isAuthenticated, signOut } = useAuth();
   const [profileOpen, setProfileOpen] = useState(false);
 
-  // Ctrl/⌘ + K focuses the global search, Escape clears it.
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        onFocusSearch();
-        searchRef.current?.focus();
-        searchRef.current?.select();
-      }
-      if (event.key === "Escape" && document.activeElement === searchRef.current) {
-        onSearchChange("");
-        searchRef.current?.blur();
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onFocusSearch, onSearchChange]);
-
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-surface/70 backdrop-blur-xl">
+      {/* ── Trust banner ────────────────────────────────────────────── */}
+      <div className="border-b border-emerald-600/20 bg-emerald-600/[0.06]">
+        <p className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-2 gap-y-0.5 px-4 py-1.5 text-center text-[11px] font-medium text-emerald-800 dark:text-emerald-300">
+          <span className="inline-flex items-center gap-1">
+            <ShieldCheck className="h-3 w-3" />
+            Verified MET BKC Campus Marketplace
+          </span>
+          <span className="text-emerald-600/50 dark:text-emerald-400/40">•</span>
+          <span>Direct Connect</span>
+          <span className="text-emerald-600/50 dark:text-emerald-400/40">•</span>
+          <span>Zero Fees</span>
+        </p>
+      </div>
       {/* ── Top bar ─────────────────────────────────────────────────── */}
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
         <div className="flex min-w-0 items-center gap-3">
@@ -82,18 +69,15 @@ export function Header({
 
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="truncate font-display text-[17px] font-semibold tracking-tight text-fg">
+              <span className="truncate text-[15px] font-semibold tracking-tight text-fg">
                 MET Campus Hub
               </span>
               <span className="pill border-brand/25 bg-brand/10 text-brand">
-                <span className="relative flex h-1.5 w-1.5">
-                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-brand" />
-                </span>
                 <span className="font-mono uppercase tracking-wide">MET BKC IOE</span>
               </span>
             </div>
             <p className="hidden text-xs text-muted sm:block">
-              Campus gear &amp; study notes &mdash; built for MET students
+              Campus gear &amp; study notes for MET students
             </p>
           </div>
         </div>
@@ -226,38 +210,12 @@ export function Header({
         </div>
       </div>
 
-      {/* ── Search + filter row ─────────────────────────────────────── */}
+      {/* ── Branch / year filter row ────────────────────────────────── */}
       <div className="border-t border-line bg-elevated/40">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:px-8">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
-            <input
-              ref={searchRef}
-              id="global-search"
-              type="text"
-              value={search}
-              onChange={(event) => onSearchChange(event.target.value)}
-              placeholder="Search calculators, textbooks, drafter sets, notes…"
-              aria-label="Search campus resources"
-              className="input pl-9 pr-16"
-            />
-            {search ? (
-              <button
-                type="button"
-                onClick={() => onSearchChange("")}
-                aria-label="Clear search"
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-faint transition hover:bg-elevated hover:text-fg"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            ) : (
-              <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 select-none items-center gap-0.5 rounded border border-line bg-elevated px-1.5 py-0.5 font-mono text-[10px] text-muted sm:flex">
-                Ctrl <span className="text-faint">+</span> K
-              </kbd>
-            )}
-          </div>
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+          <p className="text-xs text-muted">Filter the market by department and year</p>
 
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
             <div className="relative">
               <select
                 value={branch}

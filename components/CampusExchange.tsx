@@ -102,7 +102,7 @@ export function CampusExchange({
           </p>
         </div>
 
-        <div className="flex items-center gap-1 rounded-full border border-line/80 bg-white/60 p-1 shadow-sm backdrop-blur-md dark:bg-white/[0.06]">
+        <div className="flex items-center gap-1 rounded-xl border border-line bg-elevated/60 p-1">
           {TABS.map((item) => {
             const activeTab = tab === item.id;
             const count = counts[item.id];
@@ -112,10 +112,10 @@ export function CampusExchange({
                 type="button"
                 onClick={() => setTab(item.id)}
                 aria-pressed={activeTab}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                className={`rounded-md px-3 py-1 text-xs font-medium transition ${
                   activeTab
-                    ? "bg-white text-fg shadow-sm ring-1 ring-line/80 dark:bg-white/10 dark:ring-white/10"
-                    : "text-muted hover:bg-white/40 hover:text-fg dark:hover:bg-white/5"
+                    ? "bg-surface text-fg shadow-sm"
+                    : "text-muted hover:bg-elevated hover:text-fg"
                 }`}
               >
                 {item.label}
@@ -202,7 +202,7 @@ function TransactionRow({
         <div
           className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${
             txn.listingType === "sale"
-              ? "border-indigo-500/20 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300"
+              ? "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300"
               : "border-brand/20 bg-emerald-500/10 text-brand"
           }`}
         >
@@ -229,7 +229,7 @@ function TransactionRow({
               {txn.slot}
             </span>
             <span
-              className={`inline-flex items-center rounded-full border px-2 py-0.5 font-medium ${status.className}`}
+              className={`inline-flex items-center rounded-md border px-2 py-0.5 font-medium ${status.className}`}
             >
               {status.label}
             </span>

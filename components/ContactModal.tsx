@@ -51,13 +51,13 @@ export function ContactModal({ listing, onClose }: ContactModalProps) {
         aria-hidden
       />
 
-      <div className="relative w-full max-w-md animate-scale-in overflow-hidden rounded-t-3xl border border-line/80 bg-white/90 shadow-2xl shadow-black/50 backdrop-blur-md dark:bg-[#171411]/90 sm:rounded-3xl">
+      <div className="relative w-full max-w-md animate-scale-in overflow-hidden rounded-t-2xl border border-line bg-surface shadow-2xl shadow-black/60 sm:rounded-2xl">
         <div className="flex items-start justify-between gap-3 border-b border-line p-5">
           <div className="flex min-w-0 items-start gap-3">
             <div
               className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border ${
                 listing.listingType === "sale"
-                  ? "border-indigo-500/20 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300"
+                  ? "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300"
                   : "border-brand/20 bg-emerald-500/10 text-brand"
               }`}
             >
@@ -133,7 +133,7 @@ export function ContactModal({ listing, onClose }: ContactModalProps) {
             </a>
             <a
               href={`tel:${digits}`}
-              className="inline-flex items-center justify-center gap-2 rounded-full border border-line-strong bg-white/70 px-4 py-2.5 text-sm font-medium text-fg transition hover:border-line hover:bg-white dark:bg-white/[0.06] dark:hover:bg-white/10"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-line-strong bg-elevated px-3 py-2.5 text-sm font-medium text-fg transition hover:border-line hover:bg-sunken"
             >
               <Phone className="h-4 w-4" />
               Call now

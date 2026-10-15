@@ -36,11 +36,11 @@ export const TYPE_STYLES: Record<
   sale: {
     label: "Sale",
     badge:
-      "border-indigo-600/25 bg-indigo-500/10 text-indigo-700 dark:border-indigo-400/25 dark:text-indigo-300",
-    dot: "bg-indigo-500 dark:bg-indigo-400",
-    accentText: "text-indigo-700 dark:text-indigo-300",
+      "border-amber-600/25 bg-amber-500/10 text-amber-700 dark:border-amber-400/25 dark:text-amber-300",
+    dot: "bg-amber-500 dark:bg-amber-400",
+    accentText: "text-amber-700 dark:text-amber-300",
     iconBox:
-      "border-indigo-600/20 bg-indigo-500/10 text-indigo-700 dark:border-indigo-400/20 dark:text-indigo-300",
+      "border-amber-600/20 bg-amber-500/10 text-amber-700 dark:border-amber-400/20 dark:text-amber-300",
   },
   donate: {
     label: "Free / Donation",
@@ -64,26 +64,12 @@ export const ACCENT_STYLES: Record<
       "border-emerald-600/20 bg-emerald-500/10 text-emerald-700 dark:border-emerald-400/20 dark:text-emerald-300",
     bar: "bg-emerald-500 dark:bg-emerald-400",
   },
-  indigo: {
-    text: "text-indigo-700 dark:text-indigo-300",
-    ring: "ring-indigo-500/20",
+  teal: {
+    text: "text-teal-700 dark:text-teal-200",
+    ring: "ring-teal-500/20",
     iconBg:
-      "border-indigo-600/20 bg-indigo-500/10 text-indigo-700 dark:border-indigo-400/20 dark:text-indigo-300",
-    bar: "bg-indigo-500 dark:bg-indigo-400",
-  },
-  violet: {
-    text: "text-violet-700 dark:text-violet-300",
-    ring: "ring-violet-500/20",
-    iconBg:
-      "border-violet-600/20 bg-violet-500/10 text-violet-700 dark:border-violet-400/20 dark:text-violet-300",
-    bar: "bg-violet-500 dark:bg-violet-400",
-  },
-  sky: {
-    text: "text-sky-700 dark:text-sky-300",
-    ring: "ring-sky-500/20",
-    iconBg:
-      "border-sky-600/20 bg-sky-500/10 text-sky-700 dark:border-sky-400/20 dark:text-sky-300",
-    bar: "bg-sky-500 dark:bg-sky-400",
+      "border-teal-600/20 bg-teal-500/10 text-teal-700 dark:border-teal-300/20 dark:text-teal-200",
+    bar: "bg-teal-500 dark:bg-teal-300",
   },
   amber: {
     text: "text-amber-700 dark:text-amber-300",

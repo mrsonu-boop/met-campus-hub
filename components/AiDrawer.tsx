@@ -58,7 +58,7 @@ export function AiDrawer({ noteSet, unit, onClose }: AiDrawerProps) {
   }, [messages, pending]);
 
   const contextLabel = noteSet
-    ? `${noteSet.subject} (${noteSet.courseCode}) — ${noteSet.branch} Engineering, Year ${noteSet.semester}${unit ? ` — ${unit.unit}` : ""}`
+    ? `${noteSet.subject} (${noteSet.courseCode}) · ${noteSet.branch} Engineering, Year ${noteSet.semester}${unit ? ` · ${unit.unit}` : ""}`
     : "General SPPU coursework";
 
   const send = useCallback(
@@ -142,20 +142,37 @@ Provide a concise, accurate, and easy-to-understand response formatted with bull
         }
 
         const finalContent = buffer.trim();
-        if (finalContent.includes("[AI_ERROR]")) {
-          throw new Error(finalContent.split("[AI_ERROR]")[1].trim());
-        }
+        const markerIndex = finalContent.indexOf("[AI_ERROR]");
+        const visibleContent = (
+          markerIndex >= 0 ? finalContent.slice(0, markerIndex) : finalContent
+        ).trim();
 
         setMessages((prev) =>
           prev.map((message) =>
             message.id === assistantId
-              ? { ...message, content: finalContent || "…", streaming: false }
+              ? { ...message, content: markerIndex >= 0 ? visibleContent : visibleContent || "…", streaming: false }
               : message,
           ),
         );
+
+        if (markerIndex >= 0) {
+          throw new Error(
+            finalContent.slice(markerIndex + "[AI_ERROR]".length).trim() ||
+              "The connection dropped before the answer finished. Please try again.",
+          );
+        }
       } catch (caught) {
-        // Drop the empty placeholder and surface the real reason instead.
-        setMessages((prev) => prev.filter((message) => message.id !== assistantId));
+        // Keep any partial answer that already streamed in; only drop the
+        // assistant bubble when it never received any text.
+        setMessages((prev) =>
+          prev
+            .map((message) =>
+              message.id === assistantId ? { ...message, streaming: false } : message,
+            )
+            .filter(
+              (message) => message.id !== assistantId || message.content.trim().length > 0,
+            ),
+        );
         setError(
           caught instanceof Error
             ? caught.message
@@ -180,7 +197,7 @@ Provide a concise, accurate, and easy-to-understand response formatted with bull
         role="dialog"
         aria-modal="true"
         aria-label="AI study assistant"
-        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md animate-drawer-in flex-col border-l border-line bg-white/95 shadow-2xl shadow-black/40 backdrop-blur-xl dark:bg-[#171411]/95"
+        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md animate-drawer-in flex-col border-l border-line bg-surface shadow-2xl shadow-black/60"
       >
         {/* Header */}
         <header className="flex items-start justify-between gap-3 border-b border-line bg-sunken/40 px-5 py-4">
@@ -216,10 +233,10 @@ Provide a concise, accurate, and easy-to-understand response formatted with bull
                 </div>
                 <p className="text-xs leading-relaxed text-muted">
                   {unit
-                    ? `I have ${noteSet?.subject} — ${unit.unit} in context, covering ${unit.topics.join(", ")}.`
+                    ? `I have ${noteSet?.subject} · ${unit.unit} in context, covering ${unit.topics.join(", ")}.`
                     : `I have the full ${noteSet?.subject} note set in context.`}{" "}
-                  Ask anything about it — definitions, formulas, SPPU question patterns or a simpler
-                  explanation.
+                  Ask anything about it, from definitions and formulas to SPPU question patterns
+                  or a simpler explanation.
                 </p>
               </div>
 
@@ -296,13 +313,13 @@ Provide a concise, accurate, and easy-to-understand response formatted with bull
               type="submit"
               disabled={!input.trim() || pending}
               aria-label="Send question"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand text-on-brand transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Send className="h-4 w-4" />
             </button>
           </div>
           <p className="mt-2 text-[10px] text-faint">
-            Powered by Google Gemini — answers are study aids, always cross-check against the
+            Powered by Google Gemini. Answers are study aids; always cross-check against the official SPPU syllabus and your lectures.
             official SPPU syllabus.
           </p>
         </form>

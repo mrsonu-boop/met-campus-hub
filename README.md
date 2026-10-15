@@ -127,16 +127,18 @@ lib/
 
 | Token         | Value     | Usage                            |
 | ------------- | --------- | -------------------------------- |
-| Background    | `#09090b` | `bg-zinc-950`, page + body        |
-| Card surface  | `#18181b` | `bg-zinc-900`, `.card`           |
-| Hairline      | `#27272a` | `border-zinc-800`                |
-| Text          | `#ffffff` | Headings                         |
-| Secondary     | `#a1a1aa` | `text-zinc-400` metadata         |
-| Accent        | `#34d399` | Emerald — available, rent, live  |
-| AI highlight  | `#6366f1` / `#8b5cf6` | Indigo → violet gradients |
+| Canvas        | `#f8fafc` / `#09090b` | `bg-canvas`, page + body (light / dark) |
+| Card surface  | `#ffffff` / `#18181b` | `bg-surface`, `.card`            |
+| Hairline      | `#e2e8f0` / `#27272a` | `border-line`                    |
+| Text          | `#0f172a` / `#fafafa` | Headings                         |
+| Secondary     | `#64748b` / `#a1a1aa` | `text-muted` metadata            |
+| Accent        | `#059669` / `#34d399` | Solid emerald: primary actions, rent, available |
+| Accent (sale) | `#d97706` | Amber, distinguishes sale listings from rent |
 
-Radii are `12px` on cards. Type is Inter for UI and JetBrains Mono for IDs,
-amounts, PINs and keyboard hints.
+Flat, high-contrast surfaces only: no gradients, no glassmorphism blur, no
+pill-shaped buttons. Radii are `14px` on cards (`--radius-card`) and `10px` on
+buttons and inputs. Type is Inter for UI and JetBrains Mono for IDs, amounts,
+PINs and keyboard hints.
 
 ---
 

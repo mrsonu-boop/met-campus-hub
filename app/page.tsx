@@ -1,515 +1,676 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import React, { useState } from "react";
 import {
-  BookMarked,
-  CheckCircle2,
-  GraduationCap,
-  PackageCheck,
-  ShoppingBag,
+  Search,
+  MessageCircle,
+  Phone,
+  MapPin,
   Sparkles,
+  BookOpen,
+  PlusCircle,
+  Filter,
+  GraduationCap,
+  ArrowRight,
   X,
+  Send,
+  CreditCard,
+  Flag,
+  UserCheck,
+  Building2
 } from "lucide-react";
 
-import { AiDrawer } from "@/components/AiDrawer";
-import { AuthModal, type AuthTab } from "@/components/AuthModal";
-import { AuthProvider, useAuth } from "@/components/AuthProvider";
-import { CampusExchange } from "@/components/CampusExchange";
-import { ContactModal } from "@/components/ContactModal";
-import { GearExchange } from "@/components/GearExchange";
-import { Header } from "@/components/Header";
-import { KnowledgeVault } from "@/components/KnowledgeVault";
-import { ListResourceModal } from "@/components/ListResourceModal";
-import { OnboardingModal } from "@/components/OnboardingModal";
+interface Listing {
+  id: string;
+  title: string;
+  category: string;
+  department: string;
+  year: "FE" | "SE" | "TE" | "BE";
+  condition: string;
+  price: number;
+  originalPrice: number;
+  sellerName: string;
+  phoneNumber: string;
+  location: string;
+  timeAgo: string;
+  image: string;
+}
 
-import { NOTE_SETS, SEED_LISTINGS, SEED_TRANSACTIONS } from "@/lib/data";
-import {
-  isSupabaseConfigured,
-  rowToListing,
-  supabase,
-  toListingsRow,
-  type ListingsRow,
-} from "@/lib/supabase";
-import type {
-  Branch,
-  ExchangeTransaction,
-  GearCategory,
-  GearListing,
-  ListingType,
-  NoteSet,
-  NoteUnit,
-  TabId,
-  Year,
-} from "@/lib/types";
-
-const TABS: Array<{ id: TabId; label: string; short: string; icon: typeof ShoppingBag }> = [
-  { id: "gear", label: "Gear Exchange", short: "Gear", icon: ShoppingBag },
-  { id: "vault", label: "Knowledge Vault & AI Assistant", short: "Vault", icon: BookMarked },
-  { id: "exchange", label: "Verified Exchange & QR Handoff", short: "Handoff", icon: PackageCheck },
+const SAMPLE_LISTINGS: Listing[] = [
+  {
+    id: "1",
+    title: "Casio fx-991EX ClassWiz Scientific Calculator",
+    category: "Calculators",
+    department: "Computer",
+    year: "SE",
+    condition: "Like New",
+    price: 950,
+    originalPrice: 1595,
+    sellerName: "Prathmesh Thorwat",
+    phoneNumber: "+91 98765 43210",
+    location: "Main Canteen / Library",
+    timeAgo: "2 hours ago",
+    image: "https://images.unsplash.com/photo-1587145820266-a5951ee6f620?w=600&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "2",
+    title: "Engineering Graphics Drafter & A1 Sheet Holder",
+    category: "Lab Kits & Drafters",
+    department: "Mechanical",
+    year: "FE",
+    condition: "Good",
+    price: 450,
+    originalPrice: 1100,
+    sellerName: "Aman Sharma",
+    phoneNumber: "+91 98123 45678",
+    location: "Workshop / Ground",
+    timeAgo: "5 hours ago",
+    image: "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=600&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "3",
+    title: "SPPU Semester 3 Computer Engg Textbooks (Set of 4)",
+    category: "SPPU Textbooks",
+    department: "Computer",
+    year: "SE",
+    condition: "Lightly Used",
+    price: 600,
+    originalPrice: 1400,
+    sellerName: "Neha Patil",
+    phoneNumber: "+91 97654 32109",
+    location: "Library Reading Room",
+    timeAgo: "1 day ago",
+    image: "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=600&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "4",
+    title: "Official MET Engineering Apron / Lab Coat (Size L)",
+    category: "Lab Kits & Drafters",
+    department: "Civil",
+    year: "FE",
+    condition: "Excellent",
+    price: 200,
+    originalPrice: 500,
+    sellerName: "Rohan Kulkarni",
+    phoneNumber: "+91 99887 76655",
+    location: "Main Gate / Canteen",
+    timeAgo: "1 day ago",
+    image: "https://images.unsplash.com/photo-1584697964409-373307611a51?w=600&auto=format&fit=crop&q=80"
+  }
 ];
 
-const TAB_HINTS: Record<TabId, string> = {
-  gear:
-    "Rent, sell or donate within campus. Meet only at verified IOE spots and confirm handoffs in the Verified Exchange tab.",
-  vault:
-    "Unit-wise SPPU notes, faculty-verified. Download the PDF or open the AI drawer to ask about any single unit.",
-  exchange:
-    "Scan the QR at the meetup spot, read out the 4-digit PIN, and escrow is released to the seller.",
-};
+const DEPARTMENTS = ["All Branches", "Computer", "Mechanical", "E&TC", "Civil", "AIDS"];
+const YEARS = ["All Years", "FE", "SE", "TE", "BE"];
+const CATEGORIES = ["All Gear", "Calculators", "Lab Kits & Drafters", "SPPU Textbooks", "Hostel Gear"];
 
-interface AiContext {
-  noteSet: NoteSet;
-  unit: NoteUnit | null;
-}
+export default function METCampusHubFullPage() {
+  const [selectedBranch, setSelectedBranch] = useState("All Branches");
+  const [selectedYear, setSelectedYear] = useState("All Years");
+  const [selectedCategory, setSelectedCategory] = useState("All Gear");
+  const [searchQuery, setSearchQuery] = useState("");
 
-export default function CampusHubPage() {
-  return (
-    <AuthProvider>
-      <CampusHub />
-    </AuthProvider>
-  );
-}
+  const [authView, setAuthView] = useState<"none" | "login" | "register" | "forgot">("none");
+  const [isPostModalOpen, setIsPostModalOpen] = useState(false);
+  const [isAiVaultOpen, setIsAiVaultOpen] = useState(false);
+  const [reportingItem, setReportingItem] = useState<Listing | null>(null);
+  const [reportReason, setReportReason] = useState("");
 
-function CampusHub() {
-  const { isAuthenticated, user } = useAuth();
-  const [activeTab, setActiveTab] = useState<TabId>("gear");
+  const [aiQuery, setAiQuery] = useState("");
+  const [aiChatHistory, setAiChatHistory] = useState([
+    { sender: "ai", text: "Welcome to SPPU AI Study Vault! Ask me anything regarding SPPU syllabus notes, past papers, or unit summaries." }
+  ]);
 
-  // Global filters — shared by every tab.
-  const [search, setSearch] = useState("");
-  const [branch, setBranch] = useState<Branch | "All">("All");
-  const [year, setYear] = useState<Year | "All">("All");
-
-  // Tab-local filters.
-  const [category, setCategory] = useState<GearCategory | "All Items">("All Items");
-  const [typeFilter, setTypeFilter] = useState<ListingType | "All">("All");
-
-  // Collections.
-  const [listings, setListings] = useState<GearListing[]>(SEED_LISTINGS);
-  const [transactions, setTransactions] = useState<ExchangeTransaction[]>(SEED_TRANSACTIONS);
-  const [activeTxnId, setActiveTxnId] = useState<string | null>(SEED_TRANSACTIONS[0].id);
-
-  // Overlays.
-  const [contactListing, setContactListing] = useState<GearListing | null>(null);
-  const [listModalOpen, setListModalOpen] = useState(false);
-  const [aiContext, setAiContext] = useState<AiContext | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
-  const [onboardingOpen, setOnboardingOpen] = useState(false);
-
-  const [authOpen, setAuthOpen] = useState(false);
-  const [authIntent, setAuthIntent] = useState<string | null>(null);
-  const [authTab, setAuthTab] = useState<AuthTab>("signin");
-
-  const toastTimer = useRef<number | null>(null);
-
-  /* ── Cloud sync ────────────────────────────────────────────────
-   * Pull the shared exchange from Supabase on load. An empty table (or no
-   * Supabase config at all) falls back to the bundled seed so the page is
-   * never empty. */
-  useEffect(() => {
-    if (!supabase) return;
-
-    let cancelled = false;
-
-    void (async () => {
-      try {
-        const { data, error } = await supabase
-          .from("listings")
-          .select("*")
-          .order("created_at", { ascending: false });
-        if (cancelled || error || !data || data.length === 0) return;
-        setListings((data as ListingsRow[]).map(rowToListing));
-      } catch {
-        // Network hiccup — the seed data already on screen stays in play.
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // First-time visitors see the three-step guide once; "How to Use" reopens it.
-  useEffect(() => {
-    try {
-      if (!window.localStorage.getItem("met_hub_onboarding")) setOnboardingOpen(true);
-    } catch {
-      // localStorage unavailable (private mode) — just show the guide.
-      setOnboardingOpen(true);
-    }
-  }, []);
-
-  const dismissOnboarding = useCallback(() => {
-    try {
-      window.localStorage.setItem("met_hub_onboarding", "1");
-    } catch {
-      /* never block closing the guide */
-    }
-    setOnboardingOpen(false);
-  }, []);
-
-  /**
-   * Writes a new listing to Supabase and returns the stored row.
-   *
-   * The `listings.id` column is a `uuid`, so the app's readable `gear-…` id
-   * cannot be used as the primary key. A UUID is generated here instead and the
-   * id returned by Postgres becomes the listing's identity, which keeps
-   * contact/handoff actions pointing at the right row.
-   *
-   * Returns `null` when the write fails, so the caller can keep the optimistic
-   * copy and surface the failure rather than pretending it was saved.
-   */
-  const persistListing = useCallback(
-    async (listing: GearListing): Promise<ListingsRow | null> => {
-      if (!supabase) return null;
-      try {
-        const id = crypto.randomUUID();
-        const createdAt = new Date().toISOString();
-        const { data, error } = await supabase
-          .from("listings")
-          .insert(toListingsRow(listing, id, createdAt))
-          .select()
-          .single();
-
-        if (error) {
-          console.error("Supabase listing insert failed:", error.message);
-          return null;
+  const handleRazorpayPayment = (item: Listing) => {
+    if (typeof window !== "undefined" && (window as unknown as { Razorpay?: unknown }).Razorpay) {
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_METCampusHubKey",
+        amount: item.price * 100,
+        currency: "INR",
+        name: "MET Campus Hub",
+        description: `Token Payment for ${item.title}`,
+        image: "https://images.unsplash.com/photo-1587145820266-a5951ee6f620?w=100&auto=format&fit=crop&q=80",
+        handler: function (response: { razorpay_payment_id?: string }) {
+          alert(`Payment Successful! Payment ID: ${response.razorpay_payment_id}\nOrder reserved for ${item.sellerName}`);
+        },
+        prefill: {
+          name: "Student Buyer",
+          email: "student@met.edu",
+          contact: "9876543210"
+        },
+        theme: {
+          color: "#059669"
         }
-        return (data ?? { ...toListingsRow(listing, id, createdAt) }) as ListingsRow;
-      } catch (error) {
-        console.error("Supabase listing insert failed:", error);
-        return null;
-      }
-    },
-    [],
-  );
-
-  const showToast = useCallback((message: string) => {
-    setToast(message);
-    if (toastTimer.current) window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToast(null), 3600);
-  }, []);
-
-  /**
-   * Protected actions (list a resource, contact a seller) route through here so
-   * a signed-out visitor always lands on the auth dialog with the reason
-   * explained, instead of silently doing nothing.
-   */
-  const requireAuth = useCallback(
-    (intent: string, run: () => void) => {
-      if (isAuthenticated) {
-        run();
-        return;
-      }
-      setAuthIntent(intent);
-      setAuthTab("signin");
-      setAuthOpen(true);
-    },
-    [isAuthenticated],
-  );
-
-  const query = search.trim().toLowerCase();
-
-  /* ── Gear Exchange ─────────────────────────────────────────────── */
-  const filteredListings = useMemo(() => {
-    return listings.filter((listing) => {
-      if (branch !== "All" && listing.branch !== branch) return false;
-      if (year !== "All" && listing.year !== year) return false;
-      if (category !== "All Items" && listing.category !== category) return false;
-      if (typeFilter !== "All" && listing.listingType !== typeFilter) return false;
-      if (query) {
-        const haystack = [
-          listing.title,
-          listing.subtitle,
-          listing.seller,
-          listing.spot,
-          listing.category,
-          listing.branch,
-          listing.year,
-        ]
-          .join(" ")
-          .toLowerCase();
-        if (!haystack.includes(query)) return false;
-      }
-      return true;
-    });
-  }, [branch, category, listings, query, typeFilter, year]);
-
-  /* ── Knowledge Vault ───────────────────────────────────────────── */
-  const filteredNoteSets = useMemo(() => {
-    return NOTE_SETS.filter((noteSet) => {
-      if (branch !== "All" && noteSet.branch !== branch) return false;
-      if (year !== "All" && noteSet.semester !== year) return false;
-      if (query) {
-        const haystack = [
-          noteSet.subject,
-          noteSet.courseCode,
-          noteSet.description,
-          noteSet.units.map((unit) => `${unit.unit} ${unit.topics.join(" ")}`).join(" "),
-        ]
-          .join(" ")
-          .toLowerCase();
-        if (!haystack.includes(query)) return false;
-      }
-      return true;
-    });
-  }, [branch, query, year]);
-
-  /* ── Handoff tracker ───────────────────────────────────────────── */
-  const filteredTransactions = useMemo(() => {
-    return transactions.filter((txn) => {
-      if (branch !== "All" && txn.branch !== branch) return false;
-      if (year !== "All" && txn.year !== year) return false;
-      if (query && !`${txn.item} ${txn.counterparty} ${txn.meetSpot}`.toLowerCase().includes(query)) {
-        return false;
-      }
-      return true;
-    });
-  }, [branch, query, transactions, year]);
-
-  const resetFilters = useCallback(() => {
-    setCategory("All Items");
-    setTypeFilter("All");
-  }, []);
-
-  const handleNewListing = useCallback(
-    (listing: GearListing) => {
-      // Optimistic: show it immediately with a local id, then swap in the
-      // Postgres row once the insert resolves so the card carries the real
-      // uuid that contact/handoff actions depend on.
-      setListings((prev) => [listing, ...prev]);
-      setActiveTab("gear");
-      setCategory("All Items");
-      setTypeFilter("All");
-
-      void (async () => {
-        const row = await persistListing(listing);
-
-        if (!row) {
-          // Local mode (no Supabase) — nothing to reconcile.
-          if (isSupabaseConfigured()) {
-            showToast(`"${listing.title}" is visible here but could not be synced.`);
-          } else {
-            showToast(`"${listing.title}" is live on the Gear Exchange.`);
-          }
-          return;
-        }
-
-        setListings((prev) =>
-          prev.map((item) => (item.id === listing.id ? rowToListing(row) : item)),
-        );
-        showToast(`"${listing.title}" is live on the Gear Exchange.`);
-      })();
-    },
-    [persistListing, showToast],
-  );
-
-  const handleStatusChange = useCallback(
-    (id: string, status: ExchangeTransaction["status"]) => {
-      setTransactions((prev) => prev.map((txn) => (txn.id === id ? { ...txn, status } : txn)));
-      showToast(
-        status === "verified"
-          ? "Handoff verified — escrow released to the seller."
-          : "Transaction reopened and moved back to the active queue.",
-      );
-    },
-    [showToast],
-  );
-
-  const counts: Record<TabId, number> = {
-    gear: filteredListings.length,
-    vault: filteredNoteSets.length,
-    exchange: filteredTransactions.length,
+      };
+      const rzp = new ((window as unknown as { Razorpay: new (opts: unknown) => { open: () => void } }).Razorpay)(options);
+      rzp.open();
+    } else {
+      alert(`Razorpay Sandbox Mode: Initializing ₹${item.price} payment for ${item.title}.\nAdd <script src="https://checkout.razorpay.com/v1/checkout.js"></script> in layout.tsx to activate live popup.`);
+    }
   };
 
-  return (
-    <>
-      <Header
-        search={search}
-        onSearchChange={setSearch}
-        branch={branch}
-        onBranchChange={setBranch}
-        year={year}
-        onYearChange={setYear}
-        onListResource={() =>
-          requireAuth("Sign in to publish a resource to the campus exchange.", () =>
-            setListModalOpen(true),
-          )
+  const handleAiSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!aiQuery.trim()) return;
+
+    const userMsg = aiQuery;
+    setAiChatHistory((prev) => [...prev, { sender: "user", text: userMsg }]);
+    setAiQuery("");
+
+    setTimeout(() => {
+      setAiChatHistory((prev) => [
+        ...prev,
+        {
+          sender: "ai",
+          text: `[SPPU AI Vault Response]: Here is a key summary for "${userMsg}" grounded in SPPU unit syllabus notes.`
         }
-        onFocusSearch={() => setSearch((prev) => prev)}
-        onSignIn={() => {
-          setAuthIntent(null);
-          setAuthTab("signin");
-          setAuthOpen(true);
-        }}
-        onHowToUse={() => setOnboardingOpen(true)}
-      />
+      ]);
+    }, 800);
+  };
 
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-        {/* Hero — elegant serif headline over the pastel glass. */}
-        <section className="animate-fade-up mb-7">
-          <span className="pill border-brand/25 bg-brand/[0.07] text-brand">
-            MET BKC IOE &middot; Nashik
-          </span>
-          <h1 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-fg sm:text-[2.6rem] sm:leading-[1.1]">
-            Study smarter, every single day.
-          </h1>
-          <p className="mt-2.5 max-w-xl text-sm leading-relaxed text-muted sm:text-[15px]">
-            Rent or swap campus gear, grab SPPU-aligned notes, and ask the AI
-            assistant &mdash; all from one place, right here at MET.
-          </p>
-        </section>
+  const filteredListings = SAMPLE_LISTINGS.filter((item) => {
+    const matchesBranch = selectedBranch === "All Branches" || item.department === selectedBranch;
+    const matchesYear = selectedYear === "All Years" || item.year === selectedYear;
+    const matchesCategory = selectedCategory === "All Gear" || item.category === selectedCategory;
+    const matchesSearch =
+      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.sellerName.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesBranch && matchesYear && matchesCategory && matchesSearch;
+  });
 
-        {/* Segmented control — floating pill nav */}
-        <div className="mb-5 flex flex-col gap-3">
-          <div
-            role="tablist"
-            aria-label="Campus Hub sections"
-            className="scroll-thin -mx-1 flex gap-1 overflow-x-auto rounded-full border border-line/80 bg-white/60 p-1 shadow-sm backdrop-blur-md dark:bg-white/[0.06]"
-          >
-            {TABS.map((tab) => {
-              const active = activeTab === tab.id;
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  role="tab"
-                  type="button"
-                  aria-selected={active}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                    active ? "text-canvas" : "text-muted hover:text-fg"
-                  }`}
-                >
-                  {active && (
-                    <motion.span
-                      layoutId="hub-tab-pill"
-                      transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                      className="absolute inset-0 rounded-full bg-black shadow-[0_6px_16px_-6px_rgb(0_0_0/0.5)]"
-                    />
-                  )}
-                  <Icon className={`relative z-10 h-4 w-4 ${active ? "text-white" : "text-brand"}`} />
-                  <span className="relative z-10 hidden sm:inline">{tab.label}</span>
-                  <span className="relative z-10 sm:hidden">{tab.short}</span>
-                  <span
-                    className={`relative z-10 rounded-full px-1.5 py-0.5 font-mono text-[10px] ${
-                      active ? "bg-white/20 text-white" : "bg-white/70 text-faint dark:bg-white/10"
-                    }`}
-                  >
-                    {counts[tab.id]}
-                  </span>
-                </button>
-              );
-            })}
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased relative">
+      {/* 1. TOP ANNOUNCEMENT BAR */}
+      <div className="bg-zinc-900 text-zinc-300 text-xs py-2 px-4 text-center font-medium border-b border-zinc-800 flex items-center justify-center gap-2">
+        <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span>
+          <strong>MET BKC Campus Hub:</strong> Verified Student Exchange • 0% Brokerage • Razorpay Direct Tokens & WhatsApp Handoff
+        </span>
+      </div>
+
+      {/* 2. NAVBAR */}
+      <header className="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <a href="#" className="flex items-center gap-2">
+              <div className="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center text-white font-black text-lg shadow-sm">
+                M
+              </div>
+              <div>
+                <span className="font-bold text-lg text-slate-900 tracking-tight block leading-none">
+                  MET Campus Hub
+                </span>
+                <span className="text-[10px] text-emerald-700 font-semibold tracking-wide uppercase">
+                  BKC IOE Nashik
+                </span>
+              </div>
+            </a>
           </div>
 
-          <p className="flex items-start gap-2 text-xs leading-relaxed text-muted">
-            <Sparkles className="mt-0.5 h-3 w-3 shrink-0 text-brand" />
-            {TAB_HINTS[activeTab]}
-          </p>
-        </div>
-
-        {/* Active tab content */}
-        {activeTab === "gear" && (
-          <GearExchange
-            listings={filteredListings}
-            category={category}
-            onCategoryChange={setCategory}
-            typeFilter={typeFilter}
-            onTypeFilterChange={setTypeFilter}
-            onContact={(listing) =>
-              requireAuth("Sign in so the seller knows who is messaging them.", () =>
-                setContactListing(listing),
-              )
-            }
-            search={search}
-            branchFiltered={branch !== "All"}
-            yearFiltered={year !== "All"}
-            onResetFilters={resetFilters}
-          />
-        )}
-
-        {activeTab === "vault" && (
-          <KnowledgeVault
-            noteSets={filteredNoteSets}
-            onAskAi={(noteSet, unit) => setAiContext({ noteSet, unit })}
-          />
-        )}
-
-        {activeTab === "exchange" && (
-          <CampusExchange
-            transactions={filteredTransactions}
-            activeId={activeTxnId}
-            onSelect={setActiveTxnId}
-            onStatusChange={handleStatusChange}
-          />
-        )}
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-line bg-surface/50">
-        <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-3 px-4 py-6 text-xs text-faint sm:flex-row sm:items-center sm:px-6 lg:px-8">
-          <p className="inline-flex items-center gap-1.5">
-            <GraduationCap className="h-3.5 w-3.5" />
-            MET Campus Hub — a student-run exchange for MET BKC IOE, SPPU curriculum.
-          </p>
-          <p className="font-mono">
-            Handoffs protected by QR + PIN escrow · Built with Next.js 15
-          </p>
-        </div>
-      </footer>
-
-      {/* Toast */}
-      {toast && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-5 z-[60] flex justify-center px-4">
-          <div className="card pointer-events-auto flex max-w-md animate-fade-up items-start gap-2.5 px-4 py-3 glow-emerald">
-            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
-            <p className="text-sm text-fg">{toast}</p>
+          <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
+            <a href="#marketplace" className="text-slate-900 hover:text-emerald-600 transition-colors">
+              Marketplace
+            </a>
             <button
-              type="button"
-              onClick={() => setToast(null)}
-              aria-label="Dismiss"
-              className="-mr-1 shrink-0 rounded p-0.5 text-muted transition hover:text-fg"
+              onClick={() => setIsAiVaultOpen(true)}
+              className="hover:text-emerald-600 transition-colors flex items-center gap-1.5"
             >
-              <X className="h-3.5 w-3.5" />
+              <Sparkles className="w-4 h-4 text-emerald-600" />
+              <span>SPPU AI Vault</span>
+            </button>
+            <a href="#how-it-works" className="hover:text-emerald-600 transition-colors">
+              Campus Handoff
+            </a>
+          </nav>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsPostModalOpen(true)}
+              className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm px-4 py-2 rounded-lg transition shadow-sm"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>Post Item Free</span>
+            </button>
+            <button
+              onClick={() => setAuthView("login")}
+              className="border border-slate-300 hover:bg-slate-100 text-slate-800 font-medium text-sm px-3.5 py-2 rounded-lg transition"
+            >
+              Log In / Register
             </button>
           </div>
         </div>
+      </header>
+
+      {/* 3. HERO & ACADEMIC BRANCH/YEAR FILTER BAR */}
+      <section className="bg-white border-b border-slate-200 py-10 px-4 sm:px-6">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold mb-3">
+            <GraduationCap className="w-4 h-4 text-emerald-600" />
+            <span>MET BKC Engineering & Polytechnic Campus</span>
+          </div>
+
+          <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight mb-3">
+            Pre-Loved Academic Gear & <span className="text-emerald-600">Syllabus Vault</span>
+          </h1>
+
+          {/* Search Box */}
+          <div className="max-w-2xl mx-auto relative mb-6">
+            <div className="relative flex items-center">
+              <Search className="w-5 h-5 text-slate-400 absolute left-4 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search calculators, drafters, lab coats, SPPU books, seller..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-11 pr-24 py-3 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white text-sm"
+              />
+            </div>
+          </div>
+
+          {/* ACADEMIC BRANCH & YEAR SELECTORS SECTION */}
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 max-w-3xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="w-full sm:w-1/2 text-left">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-emerald-600" />
+                Select Branch
+              </label>
+              <select
+                value={selectedBranch}
+                onChange={(e) => setSelectedBranch(e.target.value)}
+                className="w-full bg-white border border-slate-300 text-slate-900 text-xs font-semibold rounded-lg p-2.5 focus:ring-emerald-500 focus:border-emerald-500"
+              >
+                {DEPARTMENTS.map((dept) => (
+                  <option key={dept} value={dept}>{dept}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="w-full sm:w-1/2 text-left">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                <GraduationCap className="w-3.5 h-3.5 text-emerald-600" />
+                Select Academic Year
+              </label>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="w-full bg-white border border-slate-300 text-slate-900 text-xs font-semibold rounded-lg p-2.5 focus:ring-emerald-500 focus:border-emerald-500"
+              >
+                {YEARS.map((yr) => (
+                  <option key={yr} value={yr}>{yr}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Category Chips */}
+          <div className="flex items-center justify-center gap-2 overflow-x-auto pt-4 scrollbar-none">
+            {CATEGORIES.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition whitespace-nowrap border ${
+                  selectedCategory === cat
+                    ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                    : "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 4. ITEM GRID */}
+      <section id="marketplace" className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
+              <span>Campus Flash Deals</span>
+              <span className="text-amber-500">⚡</span>
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Filtered by: <strong>{selectedBranch}</strong> • <strong>{selectedYear}</strong>
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredListings.map((item) => (
+            <div
+              key={item.id}
+              className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between group"
+            >
+              <div>
+                <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
+                  <img
+                    src={item.image}
+                    alt={item.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                  />
+                  <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm border border-slate-200 text-emerald-800 text-xs font-bold px-2.5 py-1 rounded-md shadow-sm">
+                    {item.year} - {item.department}
+                  </div>
+                  <div className="absolute top-3 right-3 bg-slate-900/80 text-white text-[11px] font-medium px-2 py-0.5 rounded shadow-sm">
+                    {item.condition}
+                  </div>
+                </div>
+
+                <div className="p-4">
+                  <h3 className="font-bold text-slate-900 text-base leading-snug line-clamp-2 group-hover:text-emerald-700 transition-colors">
+                    {item.title}
+                  </h3>
+
+                  {/* DISPLAY PHONE NUMBER & SELLER NAME */}
+                  <div className="mt-3 p-2.5 bg-slate-50 border border-slate-200 rounded-lg space-y-1 text-xs">
+                    <div className="flex items-center justify-between font-medium text-slate-700">
+                      <span className="flex items-center gap-1.5">
+                        <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+                        {item.sellerName}
+                      </span>
+                      <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                        MET Verified
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 font-bold text-slate-900 pt-0.5">
+                      <Phone className="w-3.5 h-3.5 text-slate-500" />
+                      <span>{item.phoneNumber}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+                    <div className="flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{item.location}</span>
+                    </div>
+                    <button
+                      onClick={() => setReportingItem(item)}
+                      className="text-slate-400 hover:text-rose-600 flex items-center gap-1 text-[11px] font-medium transition"
+                    >
+                      <Flag className="w-3 h-3" />
+                      <span>Report</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* CARD ACTIONS */}
+              <div className="p-4 pt-0 border-t border-slate-100 mt-2 flex flex-col gap-2">
+                <div className="flex items-center justify-between pt-2">
+                  <div>
+                    <span className="text-xs text-slate-400 block line-through">
+                      ₹{item.originalPrice}
+                    </span>
+                    <span className="text-xl font-extrabold text-slate-900">
+                      ₹{item.price}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={() => handleRazorpayPayment(item)}
+                    className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs px-3 py-2 rounded-lg transition shadow-sm"
+                  >
+                    <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Pay / Reserve</span>
+                  </button>
+                </div>
+
+                <a
+                  href={`https://wa.me/${item.phoneNumber.replace(/\D/g, "")}?text=Hi%20${encodeURIComponent(
+                    item.sellerName
+                  )},%20I%20am%20interested%20in%20buying%20your%20${encodeURIComponent(
+                    item.title
+                  )}%20listed%20on%20MET%20Campus%20Hub.`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-2 rounded-lg transition shadow-sm"
+                >
+                  <MessageCircle className="w-4 h-4 fill-current" />
+                  <span>Chat on WhatsApp</span>
+                </a>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* 5. AUTH SUITE MODALS */}
+      {authView !== "none" && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative border border-slate-200">
+            <button
+              onClick={() => setAuthView("none")}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {authView === "login" && (
+              <div>
+                <h3 className="text-xl font-bold text-slate-900 mb-1">Welcome Back to MET Hub</h3>
+                <p className="text-xs text-slate-500 mb-4">Log in with your verified student account.</p>
+
+                <form onSubmit={(e) => { e.preventDefault(); alert("Logged in successfully!"); setAuthView("none"); }} className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">College Email / Phone</label>
+                    <input type="text" placeholder="student@met.edu or 9876543210" required className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Password</label>
+                    <input type="password" placeholder="••••••••" required className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs pt-1">
+                    <button type="button" onClick={() => setAuthView("forgot")} className="text-emerald-700 hover:underline font-semibold">
+                      Forgot Password?
+                    </button>
+                    <button type="button" onClick={() => setAuthView("register")} className="text-slate-600 hover:underline">
+                      Need an account? Register
+                    </button>
+                  </div>
+
+                  <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-semibold transition mt-2">
+                    Sign In
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {authView === "register" && (
+              <div>
+                <h3 className="text-xl font-bold text-slate-900 mb-1">Create Student Account</h3>
+                <p className="text-xs text-slate-500 mb-4">Verify your details for MET BKC campus trading.</p>
+
+                <form onSubmit={(e) => { e.preventDefault(); alert("Registration completed! OTP Sent for verification."); setAuthView("none"); }} className="space-y-3">
+                  <input type="text" placeholder="Full Name (e.g. Prathmesh Thorwat)" required className="w-full px-3.5 py-2 border rounded-lg text-xs" />
+                  <input type="email" placeholder="College Email (student@met.edu)" required className="w-full px-3.5 py-2 border rounded-lg text-xs" />
+                  <input type="tel" placeholder="WhatsApp Phone Number" required className="w-full px-3.5 py-2 border rounded-lg text-xs" />
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">Branch</label>
+                      <select className="w-full border rounded-lg p-2 text-xs">
+                        {DEPARTMENTS.filter(d => d !== "All Branches").map(d => <option key={d}>{d}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">Year</label>
+                      <select className="w-full border rounded-lg p-2 text-xs">
+                        {YEARS.filter(y => y !== "All Years").map(y => <option key={y}>{y}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <input type="password" placeholder="Create Password" required className="w-full px-3.5 py-2 border rounded-lg text-xs" />
+
+                  <div className="text-xs text-right pt-1">
+                    <button type="button" onClick={() => setAuthView("login")} className="text-emerald-700 hover:underline font-semibold">
+                      Already registered? Log In
+                    </button>
+                  </div>
+
+                  <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">
+                    Register & Verify OTP
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {authView === "forgot" && (
+              <div>
+                <h3 className="text-xl font-bold text-slate-900 mb-1">Reset Password</h3>
+                <p className="text-xs text-slate-500 mb-4">Enter your registered email to receive a password reset link.</p>
+
+                <form onSubmit={(e) => { e.preventDefault(); alert("Reset link sent to your email!"); setAuthView("login"); }} className="space-y-3">
+                  <input type="email" placeholder="Registered Email / Phone" required className="w-full px-3.5 py-2.5 border rounded-lg text-sm" />
+                  <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">
+                    Send Reset Link
+                  </button>
+                </form>
+
+                <div className="text-xs text-center mt-3">
+                  <button type="button" onClick={() => setAuthView("login")} className="text-slate-600 hover:underline">
+                    Back to Login
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
-      {/* Overlays */}
-      <ContactModal listing={contactListing} onClose={() => setContactListing(null)} />
-
-      <ListResourceModal
-        open={listModalOpen}
-        onClose={() => setListModalOpen(false)}
-        onSubmit={handleNewListing}
-      />
-
-      <AuthModal
-        open={authOpen}
-        intent={authIntent}
-        initialTab={authTab}
-        onClose={() => {
-          setAuthOpen(false);
-          setAuthIntent(null);
-        }}
-      />
-
-      {aiContext && (
-        <AiDrawer
-          noteSet={aiContext.noteSet}
-          unit={aiContext.unit}
-          onClose={() => setAiContext(null)}
-        />
+      {/* 6. POST ITEM MODAL */}
+      {isPostModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
+            <button
+              onClick={() => setIsPostModalOpen(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Post Campus Listing</h3>
+            <p className="text-xs text-slate-500 mb-4">List unused calculators, drafters, or textbooks in 30 seconds.</p>
+            <form onSubmit={(e) => { e.preventDefault(); alert('Listing created successfully!'); setIsPostModalOpen(false); }} className="space-y-3">
+              <input type="text" placeholder="Item Title (e.g. Casio fx-991EX)" required className="w-full px-3.5 py-2.5 border rounded-lg text-sm" />
+              <input type="number" placeholder="Price (₹)" required className="w-full px-3.5 py-2.5 border rounded-lg text-sm" />
+              <input type="text" placeholder="Your WhatsApp Phone Number" required className="w-full px-3.5 py-2.5 border rounded-lg text-sm" />
+              <button type="submit" className="w-full bg-emerald-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-emerald-700">
+                Submit Listing
+              </button>
+            </form>
+          </div>
+        </div>
       )}
 
-      <OnboardingModal open={onboardingOpen} onClose={dismissOnboarding} />
+      {/* 7. SPPU AI VAULT DRAWER */}
+      {isAiVaultOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex justify-end">
+          <div className="bg-white w-full max-w-md h-full p-6 flex flex-col justify-between relative shadow-2xl">
+            <div>
+              <div className="flex items-center justify-between pb-4 border-b">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-emerald-600" />
+                  <h3 className="font-bold text-slate-900">SPPU AI Study Vault</h3>
+                </div>
+                <button onClick={() => setIsAiVaultOpen(false)} className="text-slate-400 hover:text-slate-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
 
-      {/* Screen-reader announcement of the active identity. */}
-      <p className="sr-only" aria-live="polite">
-        {user ? `Signed in as ${user.name}, ${user.year} ${user.department}.` : "Signed out."}
-      </p>
-    </>
+              <div className="mt-4 space-y-3 max-h-[60vh] overflow-y-auto">
+                {aiChatHistory.map((msg, i) => (
+                  <div
+                    key={i}
+                    className={`p-3 rounded-xl text-xs ${
+                      msg.sender === "user" ? "bg-emerald-600 text-white ml-8" : "bg-slate-100 text-slate-800 mr-8"
+                    }`}
+                  >
+                    {msg.text}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <form onSubmit={handleAiSubmit} className="pt-4 border-t flex gap-2">
+              <input
+                type="text"
+                placeholder="Ask SPPU syllabus query..."
+                value={aiQuery}
+                onChange={(e) => setAiQuery(e.target.value)}
+                className="flex-1 px-3 py-2 border rounded-lg text-xs"
+              />
+              <button type="submit" className="bg-emerald-600 text-white px-3 py-2 rounded-lg text-xs font-bold">
+                <Send className="w-4 h-4" />
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 8. REPORT MODAL */}
+      {reportingItem && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative border border-slate-200">
+            <button
+              onClick={() => setReportingItem(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2 text-rose-600 font-bold mb-1">
+              <Flag className="w-5 h-5" />
+              <h3 className="text-lg">Report Listing</h3>
+            </div>
+            <p className="text-xs text-slate-500 mb-3">
+              Reporting item: <strong>&ldquo;{reportingItem.title}&rdquo;</strong>
+            </p>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                alert("Report submitted to MET Campus Moderation Team.");
+                setReportingItem(null);
+                setReportReason("");
+              }}
+              className="space-y-3"
+            >
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Reason for Report</label>
+                <select
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value)}
+                  required
+                  className="w-full border border-slate-300 rounded-lg p-2.5 text-xs text-slate-800"
+                >
+                  <option value="">Select a reason...</option>
+                  <option value="fake">Inaccurate or Fake Listing</option>
+                  <option value="overpriced">Unreasonable Price / Spam</option>
+                  <option value="prohibited">Prohibited Item / Non-Student</option>
+                  <option value="harassment">Seller Misconduct</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Additional Details</label>
+                <textarea
+                  rows={3}
+                  placeholder="Explain why this listing violates campus guidelines..."
+                  className="w-full p-2.5 border border-slate-300 rounded-lg text-xs"
+                ></textarea>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-rose-600 hover:bg-rose-700 text-white font-semibold py-2.5 rounded-lg text-xs transition"
+              >
+                Submit Report to Admin
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
