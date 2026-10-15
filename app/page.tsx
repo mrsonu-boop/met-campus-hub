@@ -18,8 +18,18 @@ import {
   FileText,
   ShieldCheck,
   CheckCircle2,
-  Clock
+  Clock,
+  ImageIcon,
+  Upload,
+  Tag,
+  Utensils,
+  BookOpen,
+  Wrench,
+  Handshake,
+  Info
 } from "lucide-react";
+
+type ListingType = "Rent" | "Sale" | "Free";
 
 interface Listing {
   id: string;
@@ -35,7 +45,14 @@ interface Listing {
   location: string;
   timeAgo: string;
   image: string;
+  listingType: ListingType;
 }
+
+const LISTING_TYPE_BADGE: Record<ListingType, string> = {
+  Rent: "FOR RENT",
+  Sale: "FOR SALE",
+  Free: "FREE"
+};
 
 const SAMPLE_LISTINGS: Listing[] = [
   {
@@ -51,7 +68,8 @@ const SAMPLE_LISTINGS: Listing[] = [
     phoneNumber: "+91 98765 43210",
     location: "Main Canteen / Library",
     timeAgo: "2 hours ago",
-    image: "https://images.unsplash.com/photo-1587145820266-a5951ee6f620?w=600&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1587145820266-a5951ee6f620?w=600&auto=format&fit=crop&q=80",
+    listingType: "Sale"
   },
   {
     id: "2",
@@ -66,7 +84,8 @@ const SAMPLE_LISTINGS: Listing[] = [
     phoneNumber: "+91 98123 45678",
     location: "Workshop / Ground",
     timeAgo: "5 hours ago",
-    image: "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=600&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=600&auto=format&fit=crop&q=80",
+    listingType: "Rent"
   },
   {
     id: "3",
@@ -81,7 +100,8 @@ const SAMPLE_LISTINGS: Listing[] = [
     phoneNumber: "+91 97654 32109",
     location: "Library Reading Room",
     timeAgo: "1 day ago",
-    image: "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=600&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=600&auto=format&fit=crop&q=80",
+    listingType: "Sale"
   },
   {
     id: "4",
@@ -96,7 +116,8 @@ const SAMPLE_LISTINGS: Listing[] = [
     phoneNumber: "+91 99887 76655",
     location: "Main Gate / Canteen",
     timeAgo: "1 day ago",
-    image: "https://images.unsplash.com/photo-1584697964409-373307611a51?w=600&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1584697964409-373307611a51?w=600&auto=format&fit=crop&q=80",
+    listingType: "Free"
   }
 ];
 
@@ -104,11 +125,35 @@ const DEPARTMENTS = ["All Branches", "Computer", "Mechanical", "E&TC", "Civil", 
 const YEARS = ["All Years", "FE", "SE", "TE", "BE"];
 const CATEGORIES = ["All Gear", "Calculators", "Lab Kits & Drafters", "SPPU Textbooks", "Hostel Gear"];
 
-const REPORT_REASONS = [
-  "Misleading Price",
-  "Item Already Sold",
-  "Invalid Contact/PRN",
-  "Non-MET Student"
+const REPORT_REASONS = ["Incorrect Price", "Item Sold", "Fake PRN", "Spam"];
+
+const HANDOFF_ZONES = [
+  {
+    name: "Main Canteen & Food Court Zone",
+    desc: "High-footfall, well-lit spot for quick calculator, textbook and kit exchanges between lectures.",
+    icon: Utensils
+  },
+  {
+    name: "Central Library Reading Room Hall",
+    desc: "Calm, CCTV-monitored indoor area ideal for inspecting SPPU textbook sets and drafting gear.",
+    icon: BookOpen
+  },
+  {
+    name: "Mechanical / Civil Workshop Courtyard",
+    desc: "Open-air yard best suited for bulky lab kits, drafters, aprons and workshop equipment.",
+    icon: Wrench
+  },
+  {
+    name: "Campus Main Gate Security & Administrative Plaza",
+    desc: "Guarded entry plaza for verified handoffs during college hours, right beside campus security.",
+    icon: ShieldCheck
+  }
+];
+
+const RECENT_EXCHANGES = [
+  { item: "Casio FX-991CW Calculator", spot: "Exchanged at Main Canteen", time: "15 mins ago" },
+  { item: "Engineering Graphics Drafter", spot: "Exchanged at Workshop Courtyard", time: "48 mins ago" },
+  { item: "SPPU M-1 Textbook Set", spot: "Exchanged at Central Library", time: "2 hours ago" }
 ];
 
 const HOW_IT_WORKS = [
@@ -153,6 +198,19 @@ export default function METCampusHubFullPage() {
   const [reserveItem, setReserveItem] = useState<Listing | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
+  const [listings, setListings] = useState<Listing[]>(SAMPLE_LISTINGS);
+
+  const [postTitle, setPostTitle] = useState("");
+  const [postPrice, setPostPrice] = useState("");
+  const [postSeller, setPostSeller] = useState("");
+  const [postPhone, setPostPhone] = useState("");
+  const [postCategory, setPostCategory] = useState(CATEGORIES[1]);
+  const [postDepartment, setPostDepartment] = useState(DEPARTMENTS[1]);
+  const [postYear, setPostYear] = useState<"FE" | "SE" | "TE" | "BE">("FE");
+  const [postType, setPostType] = useState<ListingType>("Sale");
+  const [postImage, setPostImage] = useState("");
+  const [postImageUrl, setPostImageUrl] = useState("");
+
   const [aiQuery, setAiQuery] = useState("");
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiChatHistory, setAiChatHistory] = useState<{ sender: "ai" | "user"; text: string }[]>([
@@ -165,6 +223,65 @@ export default function METCampusHubFullPage() {
   };
 
   const tokenAmountFor = (item: Listing) => (item.price <= 500 ? 50 : 100);
+
+  const priceLabelFor = (item: Listing) =>
+    item.listingType === "Free" ? "Free" : `₹${item.price}`;
+
+  const whatsappLinkFor = (item: Listing) => {
+    const text =
+      `Hi ${item.sellerName}, I am interested in your ${item.title} ` +
+      `(${item.listingType}, ${priceLabelFor(item)}) listed on MET Campus Hub. ` +
+      `Is it still available for campus handoff at MET BKC?`;
+    return `https://wa.me/${item.phoneNumber.replace(/\D/g, "")}?text=${encodeURIComponent(text)}`;
+  };
+
+  const resetPostForm = () => {
+    setPostTitle("");
+    setPostPrice("");
+    setPostSeller("");
+    setPostPhone("");
+    setPostCategory(CATEGORIES[1]);
+    setPostDepartment(DEPARTMENTS[1]);
+    setPostYear("FE");
+    setPostType("Sale");
+    setPostImage("");
+    setPostImageUrl("");
+  };
+
+  const handlePostImageFile = (file: File | undefined) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setPostImage(typeof reader.result === "string" ? reader.result : "");
+      setPostImageUrl("");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePostSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const finalImage = postImage || postImageUrl.trim();
+    const newListing: Listing = {
+      id: `local-${Date.now()}`,
+      title: postTitle.trim() || "Untitled Campus Item",
+      category: postCategory,
+      department: postDepartment,
+      year: postYear,
+      condition: "Good",
+      price: postType === "Free" ? 0 : Math.max(0, Number(postPrice) || 0),
+      originalPrice: postType === "Free" ? 0 : Math.max(0, Math.round((Number(postPrice) || 0) * 1.8)),
+      sellerName: postSeller.trim() || "MET Student",
+      phoneNumber: postPhone.trim() || "+91 90000 00000",
+      location: "Main Canteen / Library",
+      timeAgo: "Just now",
+      image: finalImage,
+      listingType: postType
+    };
+    setListings((prev) => [newListing, ...prev]);
+    setIsPostModalOpen(false);
+    resetPostForm();
+    showToast("Listing created successfully.");
+  };
 
   const loadRazorpay = () =>
     new Promise<boolean>((resolve) => {
@@ -291,7 +408,7 @@ export default function METCampusHubFullPage() {
     }
   };
 
-  const filteredListings = SAMPLE_LISTINGS.filter((item) => {
+  const filteredListings = listings.filter((item) => {
     const matchesBranch = selectedBranch === "All Branches" || item.department === selectedBranch;
     const matchesYear = selectedYear === "All Years" || item.year === selectedYear;
     const matchesCategory = selectedCategory === "All Gear" || item.category === selectedCategory;
@@ -467,16 +584,28 @@ export default function METCampusHubFullPage() {
             >
               <div>
                 <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
-                  <img
-                    src={item.image}
-                    alt={item.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                  />
+                  {item.image ? (
+                    <img
+                      src={item.image}
+                      alt={item.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 bg-slate-100">
+                      <ImageIcon className="w-10 h-10" />
+                      <span className="text-[10px] font-semibold text-slate-400 mt-1 uppercase tracking-wide">
+                        No Photo
+                      </span>
+                    </div>
+                  )}
                   <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm border border-slate-200 text-emerald-800 text-xs font-bold px-2.5 py-1 rounded-md shadow-sm">
                     {item.year} - {item.department}
                   </div>
                   <div className="absolute top-3 right-3 bg-slate-900/80 text-white text-[11px] font-medium px-2 py-0.5 rounded shadow-sm">
                     {item.condition}
+                  </div>
+                  <div className="absolute bottom-3 left-3 bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm tracking-wide">
+                    {LISTING_TYPE_BADGE[item.listingType]}
                   </div>
                 </div>
 
@@ -523,11 +652,13 @@ export default function METCampusHubFullPage() {
               <div className="p-4 pt-0 border-t border-slate-100 mt-2 flex flex-col gap-2">
                 <div className="flex items-center justify-between pt-2">
                   <div>
-                    <span className="text-xs text-slate-400 block line-through">
-                      ₹{item.originalPrice}
-                    </span>
+                    {item.listingType !== "Free" && item.originalPrice > item.price && (
+                      <span className="text-xs text-slate-400 block line-through">
+                        ₹{item.originalPrice}
+                      </span>
+                    )}
                     <span className="text-xl font-extrabold text-slate-900">
-                      ₹{item.price}
+                      {item.listingType === "Free" ? "FREE" : `₹${item.price}`}
                     </span>
                   </div>
 
@@ -541,11 +672,7 @@ export default function METCampusHubFullPage() {
                 </div>
 
                 <a
-                  href={`https://wa.me/${item.phoneNumber.replace(/\D/g, "")}?text=Hi%20${encodeURIComponent(
-                    item.sellerName
-                  )},%20I%20am%20interested%20in%20buying%20your%20${encodeURIComponent(
-                    item.title
-                  )}%20listed%20on%20MET%20Campus%20Hub.`}
+                  href={whatsappLinkFor(item)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-2 rounded-lg transition shadow-sm"
@@ -556,6 +683,75 @@ export default function METCampusHubFullPage() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* 4B. OFFICIAL CAMPUS HANDOFF ZONES */}
+      <section id="handoff-zones" className="bg-slate-50 border-y border-slate-200 py-12 px-4 sm:px-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center max-w-2xl mx-auto mb-8">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold mb-3">
+              <Handshake className="w-4 h-4 text-emerald-600" />
+              <span>Official Campus Handoff Spots</span>
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900">MET Campus Handoff Zones</h2>
+            <p className="text-slate-500 text-sm mt-1">
+              Verified physical exchange locations at MET BKC IOE, Nashik
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {HANDOFF_ZONES.map((zone) => {
+              const Icon = zone.icon;
+              return (
+                <div
+                  key={zone.name}
+                  className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition flex flex-col gap-3"
+                >
+                  <div className="w-10 h-10 bg-emerald-600 text-white rounded-lg flex items-center justify-center">
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <h3 className="font-bold text-slate-900 text-sm leading-snug">{zone.name}</h3>
+                  <p className="text-slate-500 text-xs leading-relaxed">{zone.desc}</p>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4 max-w-3xl mx-auto mb-8">
+            <Info className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+            <p className="text-xs text-amber-900 leading-relaxed">
+              Always inspect items physically at these designated campus handoff spots before making payments or
+              completing exchanges.
+            </p>
+          </div>
+
+          <div className="max-w-3xl mx-auto">
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              Recent Sample Exchanges
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {RECENT_EXCHANGES.map((ex) => (
+                <div key={ex.item} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="font-semibold text-slate-900 text-xs leading-snug">{ex.item}</p>
+                      <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-slate-400" />
+                        {ex.spot}
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {ex.time}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -735,10 +931,10 @@ export default function METCampusHubFullPage() {
             {authView === "forgot" && (
               <div>
                 <h3 className="text-xl font-bold text-slate-900 mb-1">Reset Password</h3>
-                <p className="text-xs text-slate-500 mb-4">Enter your registered email to receive a password reset link.</p>
+                <p className="text-xs text-slate-500 mb-4">Enter your PRN or registered email to receive a password reset link.</p>
 
-                <form onSubmit={(e) => { e.preventDefault(); showToast("Reset link sent to your email."); setAuthView("login"); }} className="space-y-3">
-                  <input type="email" placeholder="Registered Email / Phone" required className="w-full px-3.5 py-2.5 border rounded-lg text-sm" />
+                <form onSubmit={(e) => { e.preventDefault(); showToast("Reset Link Sent"); setAuthView("login"); }} className="space-y-3">
+                  <input type="text" placeholder="PRN Number or Registered Email" required className="w-full px-3.5 py-2.5 border rounded-lg text-sm" />
                   <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">
                     Send Reset Link
                   </button>
@@ -772,10 +968,129 @@ export default function METCampusHubFullPage() {
             </button>
             <h3 className="text-xl font-bold text-slate-900 mb-2">Post Campus Listing</h3>
             <p className="text-xs text-slate-500 mb-4">List unused calculators, drafters, or textbooks in 30 seconds.</p>
-            <form onSubmit={(e) => { e.preventDefault(); showToast("Listing created successfully."); setIsPostModalOpen(false); }} className="space-y-3">
-              <input type="text" placeholder="Item Title (e.g. Casio fx-991EX)" required className="w-full px-3.5 py-2.5 border rounded-lg text-sm" />
-              <input type="number" placeholder="Price (₹)" required className="w-full px-3.5 py-2.5 border rounded-lg text-sm" />
-              <input type="text" placeholder="Your WhatsApp Phone Number" required className="w-full px-3.5 py-2.5 border rounded-lg text-sm" />
+            <form onSubmit={handlePostSubmit} className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+              <input
+                type="text"
+                placeholder="Item Title (e.g. Casio fx-991EX)"
+                required
+                value={postTitle}
+                onChange={(e) => setPostTitle(e.target.value)}
+                className="w-full px-3.5 py-2.5 border rounded-lg text-sm"
+              />
+
+              <div className="grid grid-cols-3 gap-2">
+                {(["Rent", "Sale", "Free"] as ListingType[]).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setPostType(t)}
+                    className={`py-2 rounded-lg text-xs font-bold border transition ${
+                      postType === t
+                        ? "bg-emerald-600 text-white border-emerald-600"
+                        : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-slate-500 -mt-1 flex items-center gap-1">
+                <Tag className="w-3 h-3 text-slate-400" />
+                Listing type: <strong>{LISTING_TYPE_BADGE[postType]}</strong>
+              </p>
+
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={postCategory}
+                  onChange={(e) => setPostCategory(e.target.value)}
+                  className="w-full px-3 py-2.5 border rounded-lg text-xs text-slate-800"
+                >
+                  {CATEGORIES.filter((c) => c !== "All Gear").map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+                <select
+                  value={postDepartment}
+                  onChange={(e) => setPostDepartment(e.target.value)}
+                  className="w-full px-3 py-2.5 border rounded-lg text-xs text-slate-800"
+                >
+                  {DEPARTMENTS.filter((d) => d !== "All Branches").map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={postYear}
+                  onChange={(e) => setPostYear(e.target.value as "FE" | "SE" | "TE" | "BE")}
+                  className="w-full px-3 py-2.5 border rounded-lg text-xs text-slate-800"
+                >
+                  {YEARS.filter((y) => y !== "All Years").map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  min={0}
+                  placeholder={postType === "Free" ? "Price (free)" : "Price (₹)"}
+                  required={postType !== "Free"}
+                  disabled={postType === "Free"}
+                  value={postType === "Free" ? "" : postPrice}
+                  onChange={(e) => setPostPrice(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border rounded-lg text-sm disabled:bg-slate-100 disabled:text-slate-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Item Photo</label>
+                <label className="flex items-center justify-center gap-2 w-full border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-lg py-3 cursor-pointer text-xs font-semibold text-slate-600 transition">
+                  <Upload className="w-4 h-4 text-emerald-600" />
+                  <span>Upload Photo (JPG / PNG)</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handlePostImageFile(e.target.files?.[0])}
+                  />
+                </label>
+                <input
+                  type="url"
+                  placeholder="or paste an image URL"
+                  value={postImageUrl}
+                  onChange={(e) => {
+                    setPostImageUrl(e.target.value);
+                    setPostImage("");
+                  }}
+                  className="w-full mt-2 px-3.5 py-2 border rounded-lg text-xs"
+                />
+                {(postImage || postImageUrl) && (
+                  <div className="mt-2 relative w-full aspect-[16/10] rounded-lg overflow-hidden border border-slate-200 bg-slate-100">
+                    <img
+                      src={postImage || postImageUrl}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <input
+                type="text"
+                placeholder="Your Name (seller)"
+                required
+                value={postSeller}
+                onChange={(e) => setPostSeller(e.target.value)}
+                className="w-full px-3.5 py-2.5 border rounded-lg text-sm"
+              />
+              <input
+                type="tel"
+                placeholder="Your WhatsApp Phone Number"
+                required
+                value={postPhone}
+                onChange={(e) => setPostPhone(e.target.value)}
+                className="w-full px-3.5 py-2.5 border rounded-lg text-sm"
+              />
               <button type="submit" className="w-full bg-emerald-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-emerald-700">
                 Submit Listing
               </button>
