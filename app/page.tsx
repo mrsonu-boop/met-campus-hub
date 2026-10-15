@@ -195,6 +195,47 @@ const CATEGORIES = [
   "Lost & Found"
 ];
 
+// ── Category matching ────────────────────────────────────────────────
+// Drawer labels, filter chips and item categories drifted (e.g. "Scientific
+// Calculators" vs "Calculators", "Electronics & Microcontrollers" vs
+// "Electronics & Tech Accessories"), so every label is folded onto a canonical
+// key before comparison. Unknown labels fall back to case-insensitive
+// substring matching in both directions.
+const CATEGORY_GROUPS: { key: string; terms: string[] }[] = [
+  { key: "lab-kits", terms: ["lab kit", "drafter"] },
+  { key: "calculators", terms: ["calculat"] },
+  { key: "sppu-books", terms: ["textbook", "sppu", "notes"] },
+  {
+    key: "electronics",
+    terms: ["electronic", "microcontroller", "arduino", "tech accessories"]
+  },
+  { key: "hostel", terms: ["hostel", "room"] },
+  { key: "lost-found", terms: ["lost & found", "lost and found", "lost-found"] }
+];
+
+function categoryKey(value: string): string {
+  const normalized = value.trim().toLowerCase();
+  const group = CATEGORY_GROUPS.find((entry) =>
+    entry.terms.some((term) => normalized.includes(term))
+  );
+  return group ? group.key : normalized;
+}
+
+function categoryMatches(itemCategory: string, selectedCategory: string): boolean {
+  if (!selectedCategory || selectedCategory === "All" || selectedCategory === "All Gear") {
+    return true;
+  }
+  const item = itemCategory.trim().toLowerCase();
+  const selected = selectedCategory.trim().toLowerCase();
+  if (!item || !selected) return true;
+
+  return (
+    categoryKey(itemCategory) === categoryKey(selectedCategory) ||
+    item.includes(selected) ||
+    selected.includes(item)
+  );
+}
+
 // ── Supabase `listings` table mapping ────────────────────────────────
 // The provisioned table stores `type` ('rent' | 'sale' | 'donate') plus the
 // snake_case columns below (see supabase/schema.sql). The optional columns
@@ -1196,7 +1237,7 @@ export default function METCampusHubFullPage() {
   const filteredListings = listings.filter((item) => {
     const matchesBranch = selectedBranch === "All Branches" || item.department === selectedBranch;
     const matchesYear = selectedYear === "All Years" || item.year === selectedYear;
-    const matchesCategory = selectedCategory === "All Gear" || item.category === selectedCategory;
+    const matchesCategory = categoryMatches(item.category, selectedCategory);
     const matchesType = selectedListingType === "All" || item.listingType === selectedListingType;
     const matchesSearch =
       item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1499,7 +1540,23 @@ export default function METCampusHubFullPage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredListings.map((item) => (
+          {filteredListings.length === 0 ? (
+            <div className="col-span-full bg-white border border-dashed border-slate-300 rounded-xl p-10 text-center">
+              <p className="text-sm font-semibold text-slate-700">
+                No items listed under this category yet.
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Try resetting the filters to see every listing on campus.
+              </p>
+              <button
+                onClick={() => setSelectedCategory("All Gear")}
+                className="mt-4 inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-2 rounded-lg transition shadow-sm"
+              >
+                <span>Show All Items</span>
+              </button>
+            </div>
+          ) : (
+          filteredListings.map((item) => (
             <div
               key={item.id}
               className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between group"
@@ -1639,10 +1696,10 @@ export default function METCampusHubFullPage() {
                       </button>
                     </div>
                   );
-                })()}
+                 })()}
               </div>
             </div>
-          ))}
+          )))}
         </div>
       </section>
 
