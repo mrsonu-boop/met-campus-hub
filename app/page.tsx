@@ -62,6 +62,7 @@ interface Listing {
   timeAgo: string;
   image: string;
   listingType: ListingType;
+  description?: string;
   status?: "Available" | "Exchanged";
 }
 
@@ -74,73 +75,125 @@ const LISTING_TYPE_BADGE: Record<ListingType, string> = {
 const SAMPLE_LISTINGS: Listing[] = [
   {
     id: "1",
-    title: "Casio fx-991EX ClassWiz Scientific Calculator",
-    category: "Calculators",
+    title: "Imperial Engineering Mini Drafter & Board Combo",
+    category: "Lab Kits & Drafters",
     department: "Computer",
     year: "SE",
-    condition: "Like New",
-    price: 950,
-    originalPrice: 1595,
-    sellerName: "Prathmesh Thorwat",
+    condition: "Excellent",
+    price: 150,
+    originalPrice: 620,
+    sellerName: "Prathmesh T.",
     phoneNumber: "+91 98765 43210",
-    location: "Main Canteen / Library",
+    location: "Workshop / Ground",
     timeAgo: "2 hours ago",
-    image: "https://images.unsplash.com/photo-1587145820266-a5951ee6f620?w=600&auto=format&fit=crop&q=80",
-    listingType: "Sale"
+    image: "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=600&auto=format&fit=crop&q=80",
+    listingType: "Rent",
+    description:
+      "Complete FE Engineering Drawing set with metal stand, T-square clips, and canvas bag. Excellent condition."
   },
   {
     id: "2",
-    title: "Engineering Graphics Drafter & A1 Sheet Holder",
-    category: "Lab Kits & Drafters",
+    title: "Casio FX-991CW ClassWiz Scientific Calculator",
+    category: "Calculators",
     department: "Mechanical",
-    year: "FE",
-    condition: "Good",
-    price: 450,
-    originalPrice: 1100,
-    sellerName: "Aman Sharma",
+    year: "TE",
+    condition: "Like New",
+    price: 850,
+    originalPrice: 1595,
+    sellerName: "Sahil K.",
     phoneNumber: "+91 98123 45678",
-    location: "Workshop / Ground",
+    location: "Main Canteen / Library",
     timeAgo: "5 hours ago",
-    image: "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=600&auto=format&fit=crop&q=80",
-    listingType: "Rent"
+    image: "https://images.unsplash.com/photo-1587145820266-a5951ee6f620?w=600&auto=format&fit=crop&q=80",
+    listingType: "Sale",
+    description:
+      "Approved SPPU exam calculator with QR code function and high-resolution display. Battery fresh."
   },
   {
     id: "3",
-    title: "SPPU Semester 3 Computer Engg Textbooks (Set of 4)",
-    category: "SPPU Textbooks",
-    department: "Computer",
+    title: "SPPU M-2 (Engineering Mathematics II) TechKnowledge + Handwritten Notes",
+    category: "SPPU Textbooks & Notes",
+    department: "E&TC",
     year: "SE",
     condition: "Lightly Used",
-    price: 600,
-    originalPrice: 1400,
-    sellerName: "Neha Patil",
+    price: 0,
+    originalPrice: 0,
+    sellerName: "Aniket M.",
     phoneNumber: "+91 97654 32109",
     location: "Library Reading Room",
     timeAgo: "1 day ago",
     image: "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=600&auto=format&fit=crop&q=80",
-    listingType: "Sale"
+    listingType: "Free",
+    description:
+      "Complete unit-wise PYQ solved questions and handwritten notes for M-2 semester exams."
   },
   {
     id: "4",
-    title: "Official MET Engineering Apron / Lab Coat (Size L)",
-    category: "Lab Kits & Drafters",
-    department: "Civil",
-    year: "FE",
-    condition: "Excellent",
+    title: "Arduino Uno R3 Ultimate Starter Kit + Sensor Shield",
+    category: "Electronics & Tech Accessories",
+    department: "AIDS",
+    year: "TE",
+    condition: "Good",
     price: 200,
-    originalPrice: 500,
-    sellerName: "Rohan Kulkarni",
+    originalPrice: 1450,
+    sellerName: "Neha P.",
     phoneNumber: "+91 99887 76655",
-    location: "Main Gate / Canteen",
+    location: "Workshop / Ground",
     timeAgo: "1 day ago",
-    image: "https://images.unsplash.com/photo-1584697964409-373307611a51?w=600&auto=format&fit=crop&q=80",
-    listingType: "Free"
+    image: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=600&auto=format&fit=crop&q=80",
+    listingType: "Rent",
+    description:
+      "Includes jumper wires, breadboard, OLED display, DHT11, ultrasonic sensor, and servo motors for mini-projects."
+  },
+  {
+    id: "5",
+    title: "Wipro 12W Rechargeable LED Desk Study Lamp",
+    category: "Hostel & Room Gear",
+    department: "Civil",
+    year: "BE",
+    condition: "Excellent",
+    price: 350,
+    originalPrice: 700,
+    sellerName: "Rohan S.",
+    phoneNumber: "+91 98901 23456",
+    location: "Hostel Block / Main Gate",
+    timeAgo: "2 days ago",
+    image: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=600&auto=format&fit=crop&q=80",
+    listingType: "Sale",
+    description:
+      "3-level touch brightness control with 4-hour battery backup for late-night exam prep."
+  },
+  {
+    id: "6",
+    title: "Found: Blue Boat Airdopes Case near Canteen",
+    category: "Lost & Found",
+    department: "All Branches",
+    year: "FE",
+    condition: "Good",
+    price: 0,
+    originalPrice: 0,
+    sellerName: "Campus Safety Desk",
+    phoneNumber: "+91 90000 12345",
+    location: "Main Canteen / Library",
+    timeAgo: "3 days ago",
+    image: "https://images.unsplash.com/photo-1606220945770-b5b6c2c55bf1?w=600&auto=format&fit=crop&q=80",
+    listingType: "Free",
+    description:
+      "Found on Table 4 near Main Canteen during lunch hours. Claim with matching serial number."
   }
 ];
 
 const DEPARTMENTS = ["All Branches", "Computer", "Mechanical", "E&TC", "Civil", "AIDS"];
 const YEARS = ["All Years", "FE", "SE", "TE", "BE"];
-const CATEGORIES = ["All Gear", "Calculators", "Lab Kits & Drafters", "SPPU Textbooks", "Electronics & Microcontrollers", "Hostel Gear"];
+const CATEGORIES = [
+  "All Gear",
+  "Lab Kits & Drafters",
+  "Calculators",
+  "SPPU Textbooks & Notes",
+  "Electronics & Tech Accessories",
+  "Hostel & Room Gear",
+  "Lost & Found"
+];
 
 // ── Supabase `listings` table mapping ────────────────────────────────
 // The provisioned table stores `type` ('rent' | 'sale' | 'donate') plus the
@@ -284,9 +337,10 @@ async function insertListingRow(supabase: SupabaseClient, item: Listing): Promis
 const DRAWER_CATEGORIES = [
   { emoji: "📐", label: "Lab Kits & Drafters", value: "Lab Kits & Drafters" },
   { emoji: "🔢", label: "Scientific Calculators", value: "Calculators" },
-  { emoji: "📚", label: "SPPU Textbooks & Notes", value: "SPPU Textbooks" },
-  { emoji: "💻", label: "Electronics & Microcontrollers", value: "Electronics & Microcontrollers" },
-  { emoji: "🏠", label: "Hostel Gear", value: "Hostel Gear" }
+  { emoji: "📚", label: "SPPU Textbooks & Notes", value: "SPPU Textbooks & Notes" },
+  { emoji: "💻", label: "Electronics & Tech Accessories", value: "Electronics & Tech Accessories" },
+  { emoji: "🏠", label: "Hostel & Room Gear", value: "Hostel & Room Gear" },
+  { emoji: "🔍", label: "Lost & Found", value: "Lost & Found" }
 ];
 
 const DRAWER_LISTING_TYPES = [
@@ -1467,7 +1521,9 @@ export default function METCampusHubFullPage() {
                     </div>
                   )}
                   <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm border border-slate-200 text-emerald-800 text-xs font-bold px-2.5 py-1 rounded-md shadow-sm">
-                    {item.year} - {item.department}
+                    {item.department === "All Branches"
+                      ? "Campus Wide"
+                      : `${item.year} - ${item.department}`}
                   </div>
                   <div className="absolute top-3 right-3 bg-slate-900/80 text-white text-[11px] font-medium px-2 py-0.5 rounded shadow-sm">
                     {item.condition}
@@ -1481,6 +1537,12 @@ export default function METCampusHubFullPage() {
                   <h3 className="font-bold text-slate-900 text-base leading-snug line-clamp-2 group-hover:text-emerald-700 transition-colors">
                     {item.title}
                   </h3>
+
+                  {item.description && (
+                    <p className="mt-1.5 text-xs text-slate-500 leading-relaxed line-clamp-2">
+                      {item.description}
+                    </p>
+                  )}
 
                   {/* DISPLAY PHONE NUMBER & SELLER NAME */}
                   <div className="mt-3 p-2.5 bg-slate-50 border border-slate-200 rounded-lg space-y-1 text-xs">
