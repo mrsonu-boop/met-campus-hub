@@ -143,7 +143,7 @@ const REPORT_REASONS = [
   "Incorrect Price / Scam",
   "Item Already Sold",
   "Invalid PRN / Non-MET Student",
-  "Inappropriate Content"
+  "Inappropriate Content / Spam"
 ];
 
 const HANDOFF_ZONES = [
@@ -239,7 +239,11 @@ export default function METCampusHubFullPage() {
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
   const [isAiVaultOpen, setIsAiVaultOpen] = useState(false);
   const [reportingItem, setReportingItem] = useState<Listing | null>(null);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportReason, setReportReason] = useState("");
+  const [reportItemTitle, setReportItemTitle] = useState("");
+  const [reportSellerName, setReportSellerName] = useState("");
+  const [reportFeedback, setReportFeedback] = useState("");
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [reserveItem, setReserveItem] = useState<Listing | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -429,7 +433,7 @@ export default function METCampusHubFullPage() {
     setAuthLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: "http://localhost:3000/reset-password"
+        redirectTo: `${window.location.origin}/reset-password`
       });
 
       if (error) {
@@ -467,6 +471,24 @@ export default function METCampusHubFullPage() {
     setPostSeller(currentUser.name);
     if (currentUser.phone) setPostPhone(currentUser.phone);
     setIsPostModalOpen(true);
+  };
+
+  const openReportModal = (item?: Listing) => {
+    setReportingItem(item ?? null);
+    setReportItemTitle(item?.title ?? "");
+    setReportSellerName(item?.sellerName ?? "");
+    setReportReason("");
+    setReportFeedback("");
+    setIsReportModalOpen(true);
+  };
+
+  const closeReportModal = () => {
+    setIsReportModalOpen(false);
+    setReportingItem(null);
+    setReportItemTitle("");
+    setReportSellerName("");
+    setReportReason("");
+    setReportFeedback("");
   };
 
   const signOut = () => {
@@ -723,6 +745,13 @@ export default function METCampusHubFullPage() {
               <FileText className="w-4 h-4" />
               <span>Terms &amp; Policy</span>
             </button>
+            <button
+              onClick={() => openReportModal()}
+              className="text-rose-600 hover:text-rose-700 transition-colors flex items-center gap-1.5 font-semibold"
+            >
+              <Flag className="w-4 h-4" />
+              <span>Report Safety / Flag Listing</span>
+            </button>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -914,11 +943,10 @@ export default function METCampusHubFullPage() {
                       <span>{item.location}</span>
                     </div>
                     <button
-                      onClick={() => setReportingItem(item)}
-                      className="text-slate-400 hover:text-rose-600 flex items-center gap-1 text-[11px] font-medium transition"
+                      onClick={() => openReportModal(item)}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-1 rounded-md transition"
                     >
-                      <Flag className="w-3 h-3" />
-                      <span>Report</span>
+                      <span>🚩 Report Item</span>
                     </button>
                   </div>
                 </div>
@@ -1530,12 +1558,12 @@ export default function METCampusHubFullPage() {
         </div>
       )}
 
-      {/* 8. REPORT MODAL */}
-      {reportingItem && (
+      {/* 8. REPORT AN ITEM / LISTING SAFETY MODAL */}
+      {isReportModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative border border-slate-200">
             <button
-              onClick={() => setReportingItem(null)}
+              onClick={closeReportModal}
               className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
             >
               <X className="w-5 h-5" />
@@ -1543,21 +1571,44 @@ export default function METCampusHubFullPage() {
 
             <div className="flex items-center gap-2 text-rose-600 font-bold mb-1">
               <Flag className="w-5 h-5" />
-              <h3 className="text-lg">Report Listing</h3>
+              <h3 className="text-lg">Report an Item / Listing Safety</h3>
             </div>
             <p className="text-xs text-slate-500 mb-3">
-              Reporting: <strong>&ldquo;{reportingItem.title}&rdquo;</strong>
+              {reportingItem
+                ? "Reporting this listing to the MET BKC campus safety team."
+                : "Flag a listing or safety concern anywhere on MET Campus Hub."}
             </p>
 
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                showToast("Report submitted to MET Campus Safety Admin");
-                setReportingItem(null);
-                setReportReason("");
+                showToast("Thank you! Your report has been submitted to MET BKC Campus Safety.");
+                closeReportModal();
               }}
               className="space-y-3"
             >
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Item Title</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Casio fx-991EX Calculator"
+                  value={reportItemTitle}
+                  onChange={(e) => setReportItemTitle(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Seller Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Prathmesh Thorwat"
+                  value={reportSellerName}
+                  onChange={(e) => setReportSellerName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                />
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Reason for Report</label>
                 <div className="space-y-1.5">
@@ -1586,11 +1637,15 @@ export default function METCampusHubFullPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Additional Details</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Additional Feedback <span className="text-slate-400 font-normal">(optional)</span>
+                </label>
                 <textarea
                   rows={3}
+                  value={reportFeedback}
+                  onChange={(e) => setReportFeedback(e.target.value)}
                   placeholder="Explain why this listing violates campus guidelines..."
-                  className="w-full p-2.5 border border-slate-300 rounded-lg text-xs"
+                  className="w-full p-2.5 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-rose-500 focus:outline-none"
                 ></textarea>
               </div>
 
@@ -1598,7 +1653,7 @@ export default function METCampusHubFullPage() {
                 type="submit"
                 className="w-full bg-rose-600 hover:bg-rose-700 text-white font-semibold py-2.5 rounded-lg text-xs transition"
               >
-                Submit Report to Admin
+                Submit Report to Campus Admin
               </button>
             </form>
           </div>
@@ -1760,6 +1815,13 @@ export default function METCampusHubFullPage() {
             >
               <Sparkles className="w-3.5 h-3.5" />
               <span>SPPU AI Vault</span>
+            </button>
+            <button
+              onClick={() => openReportModal()}
+              className="text-rose-500 hover:text-rose-400 transition flex items-center gap-1.5 font-semibold"
+            >
+              <Flag className="w-3.5 h-3.5" />
+              <span>Report Safety / Flag Listing</span>
             </button>
             <span className="text-zinc-600">© 2026 MET Campus Hub</span>
           </div>
