@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   Search,
   MessageCircle,
@@ -28,6 +29,19 @@ import {
   Handshake,
   Info
 } from "lucide-react";
+
+let browserSupabase: SupabaseClient | null = null;
+
+function getSupabaseClient(): SupabaseClient | null {
+  if (typeof window === "undefined") return null;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) return null;
+  if (!browserSupabase) {
+    browserSupabase = createClient(url, anonKey);
+  }
+  return browserSupabase;
+}
 
 type ListingType = "Rent" | "Sale" | "Free";
 
@@ -204,6 +218,7 @@ export default function METCampusHubFullPage() {
   } | null>(null);
 
   const [authWarning, setAuthWarning] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
 
   const [loginId, setLoginId] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -219,6 +234,7 @@ export default function METCampusHubFullPage() {
 
   const [forgotInput, setForgotInput] = useState("");
   const [forgotSent, setForgotSent] = useState(false);
+  const [forgotError, setForgotError] = useState("");
 
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
   const [isAiVaultOpen, setIsAiVaultOpen] = useState(false);
@@ -273,35 +289,62 @@ export default function METCampusHubFullPage() {
     showToast(`Welcome, ${user.name}!`);
   };
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const id = loginId.trim();
     if (!id) {
       setLoginError("Please enter your PRN number or campus email.");
       return;
     }
-    if (!id.includes("@") && id.replace(/\D/g, "").length < 6) {
-      setLoginError("Enter a valid PRN (at least 6 digits) or a campus email.");
+    if (loginPassword.length < 1) {
+      setLoginError("Please enter your password.");
       return;
     }
-    if (loginPassword.length < 4) {
-      setLoginError("Password must be at least 4 characters.");
+
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setLoginError(
+        "Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."
+      );
       return;
     }
-    const isEmail = id.includes("@");
-    persistUser({
-      name: isEmail ? id.split("@")[0] : "MET Student",
-      prn: isEmail ? "" : id,
-      email: isEmail ? id : "",
-      branch: "MET BKC",
-      phone: ""
-    });
-    setLoginError("");
-    setLoginId("");
-    setLoginPassword("");
+
+    setAuthLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: id,
+        password: loginPassword
+      });
+
+      if (error || !data.session) {
+        setLoginError("Invalid email/PRN or password. Please try again.");
+        return;
+      }
+
+      const meta = (data.user?.user_metadata ?? {}) as {
+        name?: string;
+        prn?: string;
+        branch?: string;
+        phone?: string;
+      };
+      persistUser({
+        name: meta.name || data.user?.email?.split("@")[0] || "MET Student",
+        prn: meta.prn || "",
+        email: data.user?.email || id,
+        branch: meta.branch || "MET BKC",
+        phone: meta.phone || ""
+      });
+      setLoginError("");
+      setLoginId("");
+      setLoginPassword("");
+    } catch {
+      setLoginError("Invalid email/PRN or password. Please try again.");
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (regPrn.replace(/\D/g, "").length < 6) {
       setRegError("Enter a valid PRN (at least 6 digits).");
@@ -315,25 +358,94 @@ export default function METCampusHubFullPage() {
       setRegError("Password must be at least 6 characters.");
       return;
     }
-    persistUser({
-      name: regName.trim() || "MET Student",
-      prn: regPrn.trim(),
-      email: regEmail.trim(),
-      branch: regBranch,
-      phone: regPhone.trim()
-    });
-    setRegError("");
-    setRegName("");
-    setRegPrn("");
-    setRegEmail("");
-    setRegPhone("");
-    setRegPassword("");
+
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setRegError(
+        "Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."
+      );
+      return;
+    }
+
+    setAuthLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: regEmail.trim(),
+        password: regPassword,
+        options: {
+          data: {
+            name: regName.trim(),
+            prn: regPrn.trim(),
+            branch: regBranch,
+            phone: regPhone.trim()
+          }
+        }
+      });
+
+      if (error) {
+        setRegError(error.message);
+        return;
+      }
+
+      setRegError("");
+      setRegName("");
+      setRegPrn("");
+      setRegEmail("");
+      setRegPhone("");
+      setRegPassword("");
+
+      if (data.session) {
+        persistUser({
+          name: regName.trim() || "MET Student",
+          prn: regPrn.trim(),
+          email: regEmail.trim(),
+          branch: regBranch,
+          phone: regPhone.trim()
+        });
+      } else {
+        showToast("Account created. Please check your email to confirm, then log in.");
+        setView("login");
+      }
+    } catch (err) {
+      setRegError(err instanceof Error ? err.message : "Registration failed. Please try again.");
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
-  const handleForgotSubmit = (e: React.FormEvent) => {
+  const handleForgotSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!forgotInput.trim()) return;
-    setForgotSent(true);
+    const email = forgotInput.trim();
+    if (!email) return;
+
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setForgotError(
+        "Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."
+      );
+      return;
+    }
+
+    setAuthLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: "http://localhost:3000/reset-password"
+      });
+
+      if (error) {
+        setForgotError(error.message);
+        return;
+      }
+
+      setForgotError("");
+      setForgotSent(true);
+    } catch (err) {
+      setForgotError(
+        err instanceof Error ? err.message : "Could not send reset link. Please try again."
+      );
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
   const closeAuth = () => {
@@ -342,6 +454,7 @@ export default function METCampusHubFullPage() {
     setRegError("");
     setForgotSent(false);
     setForgotInput("");
+    setForgotError("");
     setAuthWarning("");
   };
 
@@ -357,6 +470,10 @@ export default function METCampusHubFullPage() {
   };
 
   const signOut = () => {
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      void supabase.auth.signOut();
+    }
     setCurrentUser(null);
     try {
       window.localStorage.removeItem("met_current_user");
@@ -1059,8 +1176,8 @@ export default function METCampusHubFullPage() {
                     </button>
                   </div>
 
-                  <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-semibold transition mt-2">
-                    Sign In
+                  <button type="submit" disabled={authLoading} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white py-2.5 rounded-lg text-sm font-semibold transition mt-2">
+                    {authLoading ? "Signing In..." : "Sign In"}
                   </button>
                 </form>
               </div>
@@ -1154,8 +1271,8 @@ export default function METCampusHubFullPage() {
                     </button>
                   </div>
 
-                  <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">
-                    Register &amp; Verify OTP
+                  <button type="submit" disabled={authLoading} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white py-2.5 rounded-lg text-sm font-semibold transition">
+                    {authLoading ? "Creating Account..." : "Register & Verify OTP"}
                   </button>
                 </form>
               </div>
@@ -1171,36 +1288,41 @@ export default function METCampusHubFullPage() {
                     <div className="flex items-start gap-2 text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5">
                       <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
                       <span>
-                        Simulated: Password reset instructions sent to your registered PRN/Email. (Prototype mode)
+                        Password reset link sent! Please check your email inbox/spam folder.
                       </span>
                     </div>
                     <button
                       type="button"
-                      onClick={() => { setForgotSent(false); setForgotInput(""); setView("login"); }}
+                      onClick={() => { setForgotSent(false); setForgotInput(""); setForgotError(""); setView("login"); }}
                       className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-semibold transition"
                     >
-                      Back to Sign In
+                      Back to Login
                     </button>
                   </div>
                 ) : (
                   <>
+                    {forgotError && (
+                      <div className="mb-3 text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+                        {forgotError}
+                      </div>
+                    )}
                     <form onSubmit={handleForgotSubmit} className="space-y-3">
                       <input
-                        type="text"
-                        placeholder="PRN Number or Registered Email"
+                        type="email"
+                        placeholder="Registered Email Address"
                         required
                         value={forgotInput}
                         onChange={(e) => setForgotInput(e.target.value)}
                         className="w-full px-3.5 py-2.5 border rounded-lg text-sm"
                       />
-                      <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">
-                        Send Reset Link
+                      <button type="submit" disabled={authLoading} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white py-2.5 rounded-lg text-sm font-semibold transition">
+                        {authLoading ? "Sending..." : "Send Reset Link"}
                       </button>
                     </form>
 
                     <div className="text-xs text-center mt-3">
                       <button type="button" onClick={() => setView("login")} className="text-slate-600 hover:underline">
-                        Back to Sign In
+                        Back to Login
                       </button>
                     </div>
                   </>
