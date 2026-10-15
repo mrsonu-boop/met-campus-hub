@@ -49,6 +49,17 @@ create table if not exists public.listings (
   created_at     timestamptz not null default now()
 );
 
+-- ── Optional: full-fidelity listings ────────────────────────────────
+-- `app/page.tsx` sends these columns when they exist and silently falls back
+-- to the base projection above when PostgREST reports them missing, so this
+-- block is optional. Run it once in the SQL editor to keep photos, academic
+-- year, original price and sold/available state across refreshes:
+--   alter table public.listings
+--     add column if not exists image          text,
+--     add column if not exists year           text,
+--     add column if not exists original_price integer,
+--     add column if not exists status         text;
+
 -- ── Row Level Security ─────────────────────────────────────────────
 -- The anon key is a public credential, so policies must stay tight.
 alter table public.users     enable row level security;

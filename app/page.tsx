@@ -142,6 +142,145 @@ const DEPARTMENTS = ["All Branches", "Computer", "Mechanical", "E&TC", "Civil", 
 const YEARS = ["All Years", "FE", "SE", "TE", "BE"];
 const CATEGORIES = ["All Gear", "Calculators", "Lab Kits & Drafters", "SPPU Textbooks", "Electronics & Microcontrollers", "Hostel Gear"];
 
+// ── Supabase `listings` table mapping ────────────────────────────────
+// The provisioned table stores `type` ('rent' | 'sale' | 'donate') plus the
+// snake_case columns below (see supabase/schema.sql). The optional columns
+// (image, year, original_price, status) are written only while they exist —
+// `listingsHasExtraColumns` flips to false on the first "column does not
+// exist" error so later posts go straight to the base projection.
+
+const LISTING_TYPE_TO_DB: Record<ListingType, string> = {
+  Rent: "rent",
+  Sale: "sale",
+  Free: "donate"
+};
+
+const DB_LISTING_TYPE_TO_APP: Record<string, ListingType> = {
+  rent: "Rent",
+  sale: "Sale",
+  donate: "Free"
+};
+
+const APP_YEARS = ["FE", "SE", "TE", "BE"];
+
+let listingsHasExtraColumns = true;
+
+interface ListingsRow {
+  id?: string | null;
+  title?: string | null;
+  category?: string | null;
+  type?: string | null;
+  price?: number | null;
+  condition?: string | null;
+  seller_name?: string | null;
+  seller_contact?: string | null;
+  meetup_spot?: string | null;
+  branch?: string | null;
+  created_at?: string | null;
+  image?: string | null;
+  year?: string | null;
+  original_price?: number | null;
+  status?: string | null;
+}
+
+/** `listings.id` is a Postgres uuid, so every locally created row gets one. */
+function newRowId(): string {
+  const uuid = globalThis.crypto?.randomUUID?.();
+  if (uuid) return uuid;
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (char) => {
+    const random = (Math.random() * 16) | 0;
+    const value = char === "x" ? random : (random & 0x3) | 0x8;
+    return value.toString(16);
+  });
+}
+
+/** Renders `created_at` as the short "2h ago" label the cards show. */
+function formatAge(createdAt: string): string {
+  const elapsed = Date.now() - new Date(createdAt).getTime();
+  if (!Number.isFinite(elapsed) || elapsed < 0) return "Just now";
+
+  const minutes = Math.floor(elapsed / 60_000);
+  if (minutes < 60) return minutes <= 1 ? "Just now" : `${minutes}m ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+
+  const days = Math.floor(hours / 24);
+  return days === 1 ? "1d ago" : `${days}d ago`;
+}
+
+/** Postgres row -> the card's `Listing`. */
+function rowToListing(row: ListingsRow): Listing {
+  const price = Number(row.price ?? 0);
+  const year = row.year && APP_YEARS.includes(row.year) ? (row.year as Listing["year"]) : "SE";
+
+  return {
+    id: row.id || newRowId(),
+    title: row.title || "Untitled Campus Item",
+    category: row.category || CATEGORIES[1],
+    department: row.branch || DEPARTMENTS[1],
+    year,
+    condition: row.condition || "Good",
+    price,
+    originalPrice: Number(row.original_price ?? 0),
+    sellerName: row.seller_name || "MET Student",
+    phoneNumber: row.seller_contact || "+91 90000 00000",
+    location: row.meetup_spot || "Main Canteen / Library",
+    timeAgo: row.created_at ? formatAge(row.created_at) : "Just now",
+    image: row.image || "",
+    listingType: DB_LISTING_TYPE_TO_APP[row.type || ""] || "Sale",
+    status: row.status === "Exchanged" ? "Exchanged" : "Available"
+  };
+}
+
+/** The card's `Listing` -> a row for `insert([ ... ])`. */
+function toListingsRow(item: Listing, extended: boolean): Record<string, unknown> {
+  const row: Record<string, unknown> = {
+    id: item.id,
+    title: item.title,
+    category: item.category,
+    type: LISTING_TYPE_TO_DB[item.listingType] || "sale",
+    price: item.price,
+    condition: item.condition,
+    seller_name: item.sellerName,
+    seller_contact: item.phoneNumber,
+    meetup_spot: item.location,
+    branch: item.department,
+    created_at: new Date().toISOString()
+  };
+
+  if (extended) {
+    row.image = item.image;
+    row.year = item.year;
+    row.original_price = item.originalPrice;
+    row.status = item.status || "Available";
+  }
+
+  return row;
+}
+
+/** PostgREST reports a missing column as PGRST204 / "column ... does not exist". */
+function isMissingColumnError(message: string, code?: string): boolean {
+  return (
+    code === "PGRST204" ||
+    /could not find the '.+' column/i.test(message) ||
+    /column .+ (of relation .+ )?does not exist/i.test(message)
+  );
+}
+
+/** Inserts one listing, degrading to the base column set if needed. */
+async function insertListingRow(supabase: SupabaseClient, item: Listing): Promise<void> {
+  if (listingsHasExtraColumns) {
+    const { error } = await supabase.from("listings").insert([toListingsRow(item, true)]);
+    if (!error) return;
+    if (!isMissingColumnError(error.message, error.code)) throw error;
+    listingsHasExtraColumns = false;
+  }
+
+  const { error } = await supabase.from("listings").insert([toListingsRow(item, false)]);
+  if (error) throw error;
+}
+
 const DRAWER_CATEGORIES = [
   { emoji: "📐", label: "Lab Kits & Drafters", value: "Lab Kits & Drafters" },
   { emoji: "🔢", label: "Scientific Calculators", value: "Calculators" },
@@ -348,6 +487,35 @@ export default function METCampusHubFullPage() {
   useEffect(() => {
     // The Terms & Conditions popup is shown on every page load/refresh.
     setShowTermsOnArrival(true);
+  }, []);
+
+  useEffect(() => {
+    // Pull the shared marketplace feed so every student sees the same items.
+    // The mock listings stay in place when Supabase is unconfigured, errors out,
+    // or the table is still empty.
+    let cancelled = false;
+
+    async function loadListings() {
+      const supabase = getSupabaseClient();
+      if (!supabase) return;
+
+      try {
+        const { data, error } = await supabase
+          .from("listings")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (cancelled || error || !data || data.length === 0) return;
+        setListings(data.map((row: ListingsRow) => rowToListing(row)));
+      } catch {
+        // Network/RLS failure — keep the seeded marketplace items.
+      }
+    }
+
+    void loadListings();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const acceptTerms = () => {
@@ -724,11 +892,11 @@ export default function METCampusHubFullPage() {
     reader.readAsDataURL(file);
   };
 
-  const handlePostSubmit = (e: React.FormEvent) => {
+  const handlePostSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const finalImage = postImage || postImageUrl.trim();
     const newListing: Listing = {
-      id: `local-${Date.now()}`,
+      id: newRowId(),
       title: postTitle.trim() || "Untitled Campus Item",
       category: postCategory,
       department: currentUser?.branch && currentUser.branch !== "MET BKC" ? currentUser.branch : postDepartment,
@@ -744,10 +912,26 @@ export default function METCampusHubFullPage() {
       listingType: postType,
       status: "Available"
     };
+
+    let publishedToSupabase = false;
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      try {
+        await insertListingRow(supabase, newListing);
+        publishedToSupabase = true;
+      } catch {
+        publishedToSupabase = false;
+      }
+    }
+
     setListings((prev) => [newListing, ...prev]);
     setIsPostModalOpen(false);
     resetPostForm();
-    showToast("Listing created successfully.");
+    showToast(
+      publishedToSupabase
+        ? "Item published successfully to MET Campus Hub!"
+        : "Item added for this session. Supabase sync is unavailable right now."
+    );
   };
 
   const loadRazorpay = () =>
