@@ -7,17 +7,18 @@ import {
   Phone,
   MapPin,
   Sparkles,
-  BookOpen,
   PlusCircle,
-  Filter,
   GraduationCap,
-  ArrowRight,
   X,
   Send,
   CreditCard,
   Flag,
   UserCheck,
-  Building2
+  Building2,
+  FileText,
+  ShieldCheck,
+  CheckCircle2,
+  Clock
 } from "lucide-react";
 
 interface Listing {
@@ -103,6 +104,40 @@ const DEPARTMENTS = ["All Branches", "Computer", "Mechanical", "E&TC", "Civil", 
 const YEARS = ["All Years", "FE", "SE", "TE", "BE"];
 const CATEGORIES = ["All Gear", "Calculators", "Lab Kits & Drafters", "SPPU Textbooks", "Hostel Gear"];
 
+const REPORT_REASONS = [
+  "Misleading Price",
+  "Item Already Sold",
+  "Invalid Contact/PRN",
+  "Non-MET Student"
+];
+
+const HOW_IT_WORKS = [
+  {
+    step: "1",
+    title: "Search & Filter",
+    desc: "Find drafters, calculators and textbooks by department and academic year.",
+    icon: Search
+  },
+  {
+    step: "2",
+    title: "Reserve & Chat",
+    desc: "Connect directly on WhatsApp or reserve the item with a small token deposit.",
+    icon: MessageCircle
+  },
+  {
+    step: "3",
+    title: "Campus Handoff",
+    desc: "Meet at verified MET BKC spots: Main Canteen, Central Library or Ground.",
+    icon: MapPin
+  }
+];
+
+const RECENT_HANDOFFS = [
+  { item: "Casio FX-991CW Calculator", spot: "Main Canteen", time: "10 mins ago" },
+  { item: "Engineering Drawing Kit", spot: "Mechanical Workshop", time: "1 hour ago" },
+  { item: "SPPU M-1 & M-2 Textbooks", spot: "Central Library", time: "Yesterday" }
+];
+
 export default function METCampusHubFullPage() {
   const [selectedBranch, setSelectedBranch] = useState("All Branches");
   const [selectedYear, setSelectedYear] = useState("All Years");
@@ -114,57 +149,146 @@ export default function METCampusHubFullPage() {
   const [isAiVaultOpen, setIsAiVaultOpen] = useState(false);
   const [reportingItem, setReportingItem] = useState<Listing | null>(null);
   const [reportReason, setReportReason] = useState("");
+  const [isTermsOpen, setIsTermsOpen] = useState(false);
+  const [reserveItem, setReserveItem] = useState<Listing | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   const [aiQuery, setAiQuery] = useState("");
-  const [aiChatHistory, setAiChatHistory] = useState([
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiChatHistory, setAiChatHistory] = useState<{ sender: "ai" | "user"; text: string }[]>([
     { sender: "ai", text: "Welcome to SPPU AI Study Vault! Ask me anything regarding SPPU syllabus notes, past papers, or unit summaries." }
   ]);
 
-  const handleRazorpayPayment = (item: Listing) => {
-    if (typeof window !== "undefined" && (window as unknown as { Razorpay?: unknown }).Razorpay) {
-      const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_METCampusHubKey",
-        amount: item.price * 100,
-        currency: "INR",
-        name: "MET Campus Hub",
-        description: `Token Payment for ${item.title}`,
-        image: "https://images.unsplash.com/photo-1587145820266-a5951ee6f620?w=100&auto=format&fit=crop&q=80",
-        handler: function (response: { razorpay_payment_id?: string }) {
-          alert(`Payment Successful! Payment ID: ${response.razorpay_payment_id}\nOrder reserved for ${item.sellerName}`);
-        },
-        prefill: {
-          name: "Student Buyer",
-          email: "student@met.edu",
-          contact: "9876543210"
-        },
-        theme: {
-          color: "#059669"
-        }
-      };
-      const rzp = new ((window as unknown as { Razorpay: new (opts: unknown) => { open: () => void } }).Razorpay)(options);
-      rzp.open();
-    } else {
-      alert(`Razorpay Sandbox Mode: Initializing ₹${item.price} payment for ${item.title}.\nAdd <script src="https://checkout.razorpay.com/v1/checkout.js"></script> in layout.tsx to activate live popup.`);
-    }
+  const showToast = (message: string) => {
+    setToast(message);
+    setTimeout(() => setToast(null), 3500);
   };
 
-  const handleAiSubmit = (e: React.FormEvent) => {
+  const tokenAmountFor = (item: Listing) => (item.price <= 500 ? 50 : 100);
+
+  const loadRazorpay = () =>
+    new Promise<boolean>((resolve) => {
+      if (typeof window === "undefined") return resolve(false);
+      if ((window as unknown as { Razorpay?: unknown }).Razorpay) return resolve(true);
+
+      const existing = document.getElementById("razorpay-checkout-js") as HTMLScriptElement | null;
+      if (existing) {
+        existing.addEventListener("load", () => resolve(true));
+        existing.addEventListener("error", () => resolve(false));
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.id = "razorpay-checkout-js";
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+
+  const handleRazorpayPayment = async (item: Listing) => {
+    const tokenAmount = tokenAmountFor(item);
+    const ready = await loadRazorpay();
+
+    if (!ready || !(window as unknown as { Razorpay?: unknown }).Razorpay) {
+      setReserveItem(item);
+      return;
+    }
+
+    let order: { id: string; amount: number; currency: string };
+    try {
+      const res = await fetch("/api/razorpay", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ amount: tokenAmount, itemTitle: item.title })
+      });
+      if (!res.ok) throw new Error("order creation failed");
+      order = (await res.json()) as { id: string; amount: number; currency: string };
+      if (!order?.id) throw new Error("missing order id");
+    } catch {
+      setReserveItem(item);
+      return;
+    }
+
+    const options = {
+      key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+      amount: order.amount,
+      currency: order.currency,
+      order_id: order.id,
+      name: "MET Campus Hub",
+      description: "Item Reservation Deposit",
+      image: "https://images.unsplash.com/photo-1587145820266-a5951ee6f620?w=100&auto=format&fit=crop&q=80",
+      handler: function (response: { razorpay_payment_id?: string; razorpay_order_id?: string }) {
+        setReserveItem(null);
+        showToast(
+          `Reservation confirmed. Token ₹${tokenAmount} paid. Payment ID: ${response.razorpay_payment_id ?? "N/A"}`
+        );
+      },
+      prefill: {
+        name: "Student Buyer",
+        email: "student@met.edu",
+        contact: "9876543210"
+      },
+      theme: {
+        color: "#059669"
+      }
+    };
+    const rzp = new ((window as unknown as { Razorpay: new (opts: unknown) => { open: () => void } }).Razorpay)(options);
+    rzp.open();
+  };
+
+  const handleAiSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!aiQuery.trim()) return;
+    const userMsg = aiQuery.trim();
+    if (!userMsg || isAiLoading) return;
 
-    const userMsg = aiQuery;
-    setAiChatHistory((prev) => [...prev, { sender: "user", text: userMsg }]);
+    const conversation = [...aiChatHistory, { sender: "user" as const, text: userMsg }];
+    setAiChatHistory([...conversation, { sender: "ai" as const, text: "" }]);
     setAiQuery("");
+    setIsAiLoading(true);
 
-    setTimeout(() => {
-      setAiChatHistory((prev) => [
-        ...prev,
-        {
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          messages: conversation.map((m) => ({
+            role: m.sender === "user" ? "user" : "assistant",
+            content: m.text
+          }))
+        })
+      });
+
+      if (!res.ok || !res.body) throw new Error("AI service unavailable");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let acc = "";
+
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        acc += decoder.decode(value, { stream: true });
+        setAiChatHistory((prev) => {
+          const copy = [...prev];
+          copy[copy.length - 1] = { sender: "ai", text: acc };
+          return copy;
+        });
+      }
+
+      if (!acc.trim()) throw new Error("empty response");
+    } catch {
+      setAiChatHistory((prev) => {
+        const copy = [...prev];
+        copy[copy.length - 1] = {
           sender: "ai",
-          text: `[SPPU AI Vault Response]: Here is a key summary for "${userMsg}" grounded in SPPU unit syllabus notes.`
-        }
-      ]);
-    }, 800);
+          text: "Sorry, the SPPU AI Study Vault is temporarily unavailable. Please try again in a moment."
+        };
+        return copy;
+      });
+    } finally {
+      setIsAiLoading(false);
+    }
   };
 
   const filteredListings = SAMPLE_LISTINGS.filter((item) => {
@@ -180,11 +304,8 @@ export default function METCampusHubFullPage() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased relative">
       {/* 1. TOP ANNOUNCEMENT BAR */}
-      <div className="bg-zinc-900 text-zinc-300 text-xs py-2 px-4 text-center font-medium border-b border-zinc-800 flex items-center justify-center gap-2">
-        <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-        <span>
-          <strong>MET BKC Campus Hub:</strong> Verified Student Exchange • 0% Brokerage • Razorpay Direct Tokens & WhatsApp Handoff
-        </span>
+      <div className="bg-zinc-900 text-zinc-300 text-xs py-2 px-4 text-center font-medium border-b border-zinc-800">
+        <span>⚡ MET BKC Campus Hub • Verified Peer-to-Peer Student Marketplace • Zero Fees &amp; 0% Brokerage</span>
       </div>
 
       {/* 2. NAVBAR */}
@@ -217,9 +338,13 @@ export default function METCampusHubFullPage() {
               <Sparkles className="w-4 h-4 text-emerald-600" />
               <span>SPPU AI Vault</span>
             </button>
-            <a href="#how-it-works" className="hover:text-emerald-600 transition-colors">
-              Campus Handoff
-            </a>
+            <button
+              onClick={() => setIsTermsOpen(true)}
+              className="hover:text-emerald-600 transition-colors flex items-center gap-1.5"
+            >
+              <FileText className="w-4 h-4" />
+              <span>Terms &amp; Policy</span>
+            </button>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -411,7 +536,7 @@ export default function METCampusHubFullPage() {
                     className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs px-3 py-2 rounded-lg transition shadow-sm"
                   >
                     <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Pay / Reserve</span>
+                    <span>Pay / Reserve Token</span>
                   </button>
                 </div>
 
@@ -434,7 +559,67 @@ export default function METCampusHubFullPage() {
         </div>
       </section>
 
-      {/* 5. AUTH SUITE MODALS */}
+      {/* 5. HOW IT WORKS & CAMPUS HANDOFF */}
+      <section id="how-it-works" className="bg-white border-y border-slate-200 py-12 px-4 sm:px-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center max-w-2xl mx-auto mb-10">
+            <h2 className="text-2xl font-bold text-slate-900">How MET Campus Hub Works</h2>
+            <p className="text-slate-500 text-sm mt-1">
+              Safe, peer-to-peer campus handoffs in 3 simple steps
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            {HOW_IT_WORKS.map((step) => {
+              const Icon = step.icon;
+              return (
+                <div key={step.step} className="bg-slate-50 border border-slate-200 rounded-xl p-6 text-center">
+                  <div className="w-12 h-12 bg-emerald-600 text-white rounded-xl flex items-center justify-center mx-auto mb-4">
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <h3 className="font-bold text-slate-900 text-base mb-1">
+                    {step.step}. {step.title}
+                  </h3>
+                  <p className="text-slate-500 text-xs sm:text-sm">{step.desc}</p>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="max-w-3xl mx-auto">
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              Recent Successful Campus Handoffs
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {RECENT_HANDOFFS.map((h) => (
+                <div
+                  key={h.item}
+                  className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm"
+                >
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="font-semibold text-slate-900 text-xs leading-snug">{h.item}</p>
+                      <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-slate-400" />
+                        {h.spot}
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {h.time}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 6. AUTH SUITE MODALS */}
       {authView !== "none" && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative border border-slate-200">
@@ -445,15 +630,36 @@ export default function METCampusHubFullPage() {
               <X className="w-5 h-5" />
             </button>
 
+            <div className="grid grid-cols-2 gap-1 bg-slate-100 rounded-lg p-1 mb-5">
+              <button
+                type="button"
+                onClick={() => setAuthView("login")}
+                className={`py-2 rounded-md text-sm font-semibold transition ${
+                  authView === "login" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Log In
+              </button>
+              <button
+                type="button"
+                onClick={() => setAuthView("register")}
+                className={`py-2 rounded-md text-sm font-semibold transition ${
+                  authView === "register" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Register
+              </button>
+            </div>
+
             {authView === "login" && (
               <div>
                 <h3 className="text-xl font-bold text-slate-900 mb-1">Welcome Back to MET Hub</h3>
                 <p className="text-xs text-slate-500 mb-4">Log in with your verified student account.</p>
 
-                <form onSubmit={(e) => { e.preventDefault(); alert("Logged in successfully!"); setAuthView("none"); }} className="space-y-3">
+                <form onSubmit={(e) => { e.preventDefault(); showToast("Logged in successfully."); setAuthView("none"); }} className="space-y-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">College Email / Phone</label>
-                    <input type="text" placeholder="student@met.edu or 9876543210" required className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Email or PRN Number</label>
+                    <input type="text" placeholder="student@met.edu or PRN Number" required className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Password</label>
@@ -481,27 +687,37 @@ export default function METCampusHubFullPage() {
                 <h3 className="text-xl font-bold text-slate-900 mb-1">Create Student Account</h3>
                 <p className="text-xs text-slate-500 mb-4">Verify your details for MET BKC campus trading.</p>
 
-                <form onSubmit={(e) => { e.preventDefault(); alert("Registration completed! OTP Sent for verification."); setAuthView("none"); }} className="space-y-3">
-                  <input type="text" placeholder="Full Name (e.g. Prathmesh Thorwat)" required className="w-full px-3.5 py-2 border rounded-lg text-xs" />
-                  <input type="email" placeholder="College Email (student@met.edu)" required className="w-full px-3.5 py-2 border rounded-lg text-xs" />
-                  <input type="tel" placeholder="WhatsApp Phone Number" required className="w-full px-3.5 py-2 border rounded-lg text-xs" />
+                <form onSubmit={(e) => { e.preventDefault(); showToast("Registration completed. OTP sent to your email/phone."); setAuthView("none"); }} className="space-y-3">
+                  <input type="text" placeholder="Full Name (e.g. Prathmesh Thorwat)" required className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-xs" />
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-[11px] font-semibold text-slate-600 mb-1">Branch</label>
-                      <select className="w-full border rounded-lg p-2 text-xs">
+                      <select className="w-full border border-slate-300 rounded-lg p-2 text-xs">
                         {DEPARTMENTS.filter(d => d !== "All Branches").map(d => <option key={d}>{d}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">Year</label>
-                      <select className="w-full border rounded-lg p-2 text-xs">
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">Academic Year</label>
+                      <select className="w-full border border-slate-300 rounded-lg p-2 text-xs">
                         {YEARS.filter(y => y !== "All Years").map(y => <option key={y}>{y}</option>)}
                       </select>
                     </div>
                   </div>
 
-                  <input type="password" placeholder="Create Password" required className="w-full px-3.5 py-2 border rounded-lg text-xs" />
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">PRN Number</label>
+                    <input type="text" placeholder="e.g. 1234567890" required className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-xs" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Personal / College Email</label>
+                    <input type="email" placeholder="you@met.edu" required className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-xs" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Phone / WhatsApp Number</label>
+                    <input type="tel" placeholder="+91 98765 43210" required className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-xs" />
+                  </div>
+                  <input type="password" placeholder="Create Password" required className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-xs" />
 
                   <div className="text-xs text-right pt-1">
                     <button type="button" onClick={() => setAuthView("login")} className="text-emerald-700 hover:underline font-semibold">
@@ -521,7 +737,7 @@ export default function METCampusHubFullPage() {
                 <h3 className="text-xl font-bold text-slate-900 mb-1">Reset Password</h3>
                 <p className="text-xs text-slate-500 mb-4">Enter your registered email to receive a password reset link.</p>
 
-                <form onSubmit={(e) => { e.preventDefault(); alert("Reset link sent to your email!"); setAuthView("login"); }} className="space-y-3">
+                <form onSubmit={(e) => { e.preventDefault(); showToast("Reset link sent to your email."); setAuthView("login"); }} className="space-y-3">
                   <input type="email" placeholder="Registered Email / Phone" required className="w-full px-3.5 py-2.5 border rounded-lg text-sm" />
                   <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">
                     Send Reset Link
@@ -535,6 +751,11 @@ export default function METCampusHubFullPage() {
                 </div>
               </div>
             )}
+
+            <p className="mt-4 text-[11px] text-slate-500 flex items-start gap-1.5 border-t border-slate-100 pt-3">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+              <span>PRN &amp; Phone numbers are verified for campus safety.</span>
+            </p>
           </div>
         </div>
       )}
@@ -551,7 +772,7 @@ export default function METCampusHubFullPage() {
             </button>
             <h3 className="text-xl font-bold text-slate-900 mb-2">Post Campus Listing</h3>
             <p className="text-xs text-slate-500 mb-4">List unused calculators, drafters, or textbooks in 30 seconds.</p>
-            <form onSubmit={(e) => { e.preventDefault(); alert('Listing created successfully!'); setIsPostModalOpen(false); }} className="space-y-3">
+            <form onSubmit={(e) => { e.preventDefault(); showToast("Listing created successfully."); setIsPostModalOpen(false); }} className="space-y-3">
               <input type="text" placeholder="Item Title (e.g. Casio fx-991EX)" required className="w-full px-3.5 py-2.5 border rounded-lg text-sm" />
               <input type="number" placeholder="Price (₹)" required className="w-full px-3.5 py-2.5 border rounded-lg text-sm" />
               <input type="text" placeholder="Your WhatsApp Phone Number" required className="w-full px-3.5 py-2.5 border rounded-lg text-sm" />
@@ -586,7 +807,7 @@ export default function METCampusHubFullPage() {
                       msg.sender === "user" ? "bg-emerald-600 text-white ml-8" : "bg-slate-100 text-slate-800 mr-8"
                     }`}
                   >
-                    {msg.text}
+                    {msg.text || "Thinking..."}
                   </div>
                 ))}
               </div>
@@ -600,7 +821,11 @@ export default function METCampusHubFullPage() {
                 onChange={(e) => setAiQuery(e.target.value)}
                 className="flex-1 px-3 py-2 border rounded-lg text-xs"
               />
-              <button type="submit" className="bg-emerald-600 text-white px-3 py-2 rounded-lg text-xs font-bold">
+              <button
+                type="submit"
+                disabled={isAiLoading}
+                className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-3 py-2 rounded-lg text-xs font-bold transition"
+              >
                 <Send className="w-4 h-4" />
               </button>
             </form>
@@ -630,7 +855,7 @@ export default function METCampusHubFullPage() {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                alert("Report submitted to MET Campus Moderation Team.");
+                showToast("Report submitted to MET Campus Moderation Team.");
                 setReportingItem(null);
                 setReportReason("");
               }}
@@ -645,10 +870,11 @@ export default function METCampusHubFullPage() {
                   className="w-full border border-slate-300 rounded-lg p-2.5 text-xs text-slate-800"
                 >
                   <option value="">Select a reason...</option>
-                  <option value="fake">Inaccurate or Fake Listing</option>
-                  <option value="overpriced">Unreasonable Price / Spam</option>
-                  <option value="prohibited">Prohibited Item / Non-Student</option>
-                  <option value="harassment">Seller Misconduct</option>
+                  {REPORT_REASONS.map((reason) => (
+                    <option key={reason} value={reason}>
+                      {reason}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -669,6 +895,175 @@ export default function METCampusHubFullPage() {
               </button>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* 9. TERMS & USAGE POLICY MODAL */}
+      {isTermsOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-6 shadow-2xl relative border border-slate-200">
+            <button
+              onClick={() => setIsTermsOpen(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2 mb-1">
+              <ShieldCheck className="w-5 h-5 text-emerald-600" />
+              <h3 className="text-xl font-bold text-slate-900">Terms &amp; Usage Policy</h3>
+            </div>
+            <p className="text-xs text-slate-500 mb-5">
+              MET Campus Hub • MET BKC Institute of Engineering, Nashik
+            </p>
+
+            <div className="space-y-4">
+              <section>
+                <h4 className="font-bold text-slate-900 text-sm mb-1">1. Student Identity</h4>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  MET Campus Hub is an exclusive campus marketplace for verified MET BKC students. All sellers
+                  and buyers must be currently enrolled students of MET BKC IOE, Nashik. Accounts are subject
+                  to campus identity verification, and non-student access is not permitted.
+                </p>
+              </section>
+
+              <section>
+                <h4 className="font-bold text-slate-900 text-sm mb-1">2. Damaged Item Policy</h4>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  If gear is damaged during a rental, handoff, or inspection window, the borrower or buyer is
+                  liable for up to 80% of the replacement cost. Damage must be reported on campus to the owner
+                  and the moderation team within 24 hours of handoff.
+                </p>
+              </section>
+
+              <section>
+                <h4 className="font-bold text-slate-900 text-sm mb-1">3. Lost Item Policy</h4>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  If a rented or reserved item is lost while in the borrower&apos;s custody, the borrower must
+                  reimburse 100% of the replacement cost to the item owner before the transaction is closed.
+                </p>
+              </section>
+
+              <section>
+                <h4 className="font-bold text-slate-900 text-sm mb-1">4. Direct Handoff Disclaimer</h4>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  All transactions occur directly between students on campus grounds. MET Campus Hub charges 0%
+                  platform fee and 0% brokerage, and is not a party to any agreement between buyers and sellers.
+                  Students are encouraged to inspect items and complete handoffs at safe campus locations such as
+                  the Main Canteen or Library.
+                </p>
+              </section>
+            </div>
+
+            <button
+              onClick={() => setIsTermsOpen(false)}
+              className="mt-6 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg text-sm transition"
+            >
+              I Understand
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 10. RESERVE TOKEN DRAWER (RAZORPAY FALLBACK) */}
+      {reserveItem && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative border border-slate-200">
+            <button
+              onClick={() => setReserveItem(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2 mb-1">
+              <CreditCard className="w-5 h-5 text-emerald-600" />
+              <h3 className="text-lg font-bold text-slate-900">Reserve with Token</h3>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">
+              Pay a small token to hold this item until campus handoff. The remaining amount is paid directly to the seller.
+            </p>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 mb-4 text-xs space-y-1">
+              <p className="font-semibold text-slate-900">{reserveItem.title}</p>
+              <div className="flex items-center justify-between text-slate-600">
+                <span>Seller</span>
+                <span className="font-medium text-slate-900">{reserveItem.sellerName}</span>
+              </div>
+              <div className="flex items-center justify-between text-slate-600">
+                <span>Item price</span>
+                <span className="font-medium text-slate-900">₹{reserveItem.price}</span>
+              </div>
+              <div className="flex items-center justify-between border-t border-slate-200 pt-1 mt-1">
+                <span className="font-semibold text-slate-900">Token deposit</span>
+                <span className="font-extrabold text-emerald-700">₹{tokenAmountFor(reserveItem)}</span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-400 mb-4">
+              Razorpay checkout is unavailable right now. Confirm to log an offline reservation request, then connect on WhatsApp.
+            </p>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setReserveItem(null)}
+                className="flex-1 border border-slate-300 hover:bg-slate-100 text-slate-700 font-semibold py-2.5 rounded-lg text-sm transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const item = reserveItem;
+                  setReserveItem(null);
+                  showToast(`Reservation logged for ${item.title}. Token ₹${tokenAmountFor(item)} payable at handoff.`);
+                }}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg text-sm transition"
+              >
+                Confirm Reservation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 11. FOOTER */}
+      <footer className="bg-zinc-900 text-zinc-400 py-10 px-4 sm:px-6 border-t border-zinc-800">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-bold text-sm">
+              M
+            </div>
+            <div>
+              <span className="font-bold text-white text-sm block leading-none">MET Campus Hub</span>
+              <span className="text-zinc-500">MET BKC Institute of Engineering, Nashik</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-5">
+            <button
+              onClick={() => setIsTermsOpen(true)}
+              className="hover:text-white transition flex items-center gap-1.5"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Terms &amp; Policy</span>
+            </button>
+            <button
+              onClick={() => setIsAiVaultOpen(true)}
+              className="hover:text-white transition flex items-center gap-1.5"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>SPPU AI Vault</span>
+            </button>
+            <span className="text-zinc-600">© 2026 MET Campus Hub</span>
+          </div>
+        </div>
+      </footer>
+
+      {/* 12. TOAST NOTIFICATION */}
+      {toast && (
+        <div className="fixed bottom-5 right-5 z-[60] bg-slate-900 text-white text-xs font-medium px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 max-w-xs">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toast}</span>
         </div>
       )}
     </div>
