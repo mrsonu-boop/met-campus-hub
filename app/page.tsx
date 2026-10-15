@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Search,
   MessageCircle,
@@ -125,7 +125,12 @@ const DEPARTMENTS = ["All Branches", "Computer", "Mechanical", "E&TC", "Civil", 
 const YEARS = ["All Years", "FE", "SE", "TE", "BE"];
 const CATEGORIES = ["All Gear", "Calculators", "Lab Kits & Drafters", "SPPU Textbooks", "Hostel Gear"];
 
-const REPORT_REASONS = ["Incorrect Price", "Item Sold", "Fake PRN", "Spam"];
+const REPORT_REASONS = [
+  "Incorrect Price / Scam",
+  "Item Already Sold",
+  "Invalid PRN / Non-MET Student",
+  "Inappropriate Content"
+];
 
 const HANDOFF_ZONES = [
   {
@@ -189,7 +194,32 @@ export default function METCampusHubFullPage() {
   const [selectedCategory, setSelectedCategory] = useState("All Gear");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const [authView, setAuthView] = useState<"none" | "login" | "register" | "forgot">("none");
+  const [view, setView] = useState<"none" | "login" | "register" | "forgot">("none");
+  const [currentUser, setCurrentUser] = useState<{
+    name: string;
+    prn: string;
+    email: string;
+    branch: string;
+    phone: string;
+  } | null>(null);
+
+  const [authWarning, setAuthWarning] = useState("");
+
+  const [loginId, setLoginId] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+
+  const [regName, setRegName] = useState("");
+  const [regPrn, setRegPrn] = useState("");
+  const [regEmail, setRegEmail] = useState("");
+  const [regBranch, setRegBranch] = useState(DEPARTMENTS[1]);
+  const [regPhone, setRegPhone] = useState("");
+  const [regPassword, setRegPassword] = useState("");
+  const [regError, setRegError] = useState("");
+
+  const [forgotInput, setForgotInput] = useState("");
+  const [forgotSent, setForgotSent] = useState(false);
+
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
   const [isAiVaultOpen, setIsAiVaultOpen] = useState(false);
   const [reportingItem, setReportingItem] = useState<Listing | null>(null);
@@ -220,6 +250,120 @@ export default function METCampusHubFullPage() {
   const showToast = (message: string) => {
     setToast(message);
     setTimeout(() => setToast(null), 3500);
+  };
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("met_current_user");
+      if (saved) setCurrentUser(JSON.parse(saved));
+    } catch {
+      // ignore malformed session data
+    }
+  }, []);
+
+  const persistUser = (user: { name: string; prn: string; email: string; branch: string; phone: string }) => {
+    setCurrentUser(user);
+    try {
+      window.localStorage.setItem("met_current_user", JSON.stringify(user));
+    } catch {
+      // storage unavailable; session stays in-memory only
+    }
+    setView("none");
+    setAuthWarning("");
+    showToast(`Welcome, ${user.name}!`);
+  };
+
+  const handleLoginSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const id = loginId.trim();
+    if (!id) {
+      setLoginError("Please enter your PRN number or campus email.");
+      return;
+    }
+    if (!id.includes("@") && id.replace(/\D/g, "").length < 6) {
+      setLoginError("Enter a valid PRN (at least 6 digits) or a campus email.");
+      return;
+    }
+    if (loginPassword.length < 4) {
+      setLoginError("Password must be at least 4 characters.");
+      return;
+    }
+    const isEmail = id.includes("@");
+    persistUser({
+      name: isEmail ? id.split("@")[0] : "MET Student",
+      prn: isEmail ? "" : id,
+      email: isEmail ? id : "",
+      branch: "MET BKC",
+      phone: ""
+    });
+    setLoginError("");
+    setLoginId("");
+    setLoginPassword("");
+  };
+
+  const handleRegisterSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (regPrn.replace(/\D/g, "").length < 6) {
+      setRegError("Enter a valid PRN (at least 6 digits).");
+      return;
+    }
+    if (!regEmail.includes("@") || !regEmail.includes(".")) {
+      setRegError("Enter a valid campus or personal email address.");
+      return;
+    }
+    if (regPassword.length < 6) {
+      setRegError("Password must be at least 6 characters.");
+      return;
+    }
+    persistUser({
+      name: regName.trim() || "MET Student",
+      prn: regPrn.trim(),
+      email: regEmail.trim(),
+      branch: regBranch,
+      phone: regPhone.trim()
+    });
+    setRegError("");
+    setRegName("");
+    setRegPrn("");
+    setRegEmail("");
+    setRegPhone("");
+    setRegPassword("");
+  };
+
+  const handleForgotSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotInput.trim()) return;
+    setForgotSent(true);
+  };
+
+  const closeAuth = () => {
+    setView("none");
+    setLoginError("");
+    setRegError("");
+    setForgotSent(false);
+    setForgotInput("");
+    setAuthWarning("");
+  };
+
+  const openPostModal = () => {
+    if (!currentUser) {
+      setAuthWarning("Please log in with your MET PRN or email to list academic gear.");
+      setView("login");
+      return;
+    }
+    setPostSeller(currentUser.name);
+    if (currentUser.phone) setPostPhone(currentUser.phone);
+    setIsPostModalOpen(true);
+  };
+
+  const signOut = () => {
+    setCurrentUser(null);
+    try {
+      window.localStorage.removeItem("met_current_user");
+    } catch {
+      // ignore
+    }
+    showToast("Signed out of MET Campus Hub.");
   };
 
   const tokenAmountFor = (item: Listing) => (item.price <= 500 ? 50 : 100);
@@ -265,13 +409,13 @@ export default function METCampusHubFullPage() {
       id: `local-${Date.now()}`,
       title: postTitle.trim() || "Untitled Campus Item",
       category: postCategory,
-      department: postDepartment,
+      department: currentUser?.branch && currentUser.branch !== "MET BKC" ? currentUser.branch : postDepartment,
       year: postYear,
       condition: "Good",
       price: postType === "Free" ? 0 : Math.max(0, Number(postPrice) || 0),
       originalPrice: postType === "Free" ? 0 : Math.max(0, Math.round((Number(postPrice) || 0) * 1.8)),
-      sellerName: postSeller.trim() || "MET Student",
-      phoneNumber: postPhone.trim() || "+91 90000 00000",
+      sellerName: currentUser?.name || postSeller.trim() || "MET Student",
+      phoneNumber: currentUser?.phone || postPhone.trim() || "+91 90000 00000",
       location: "Main Canteen / Library",
       timeAgo: "Just now",
       image: finalImage,
@@ -466,18 +610,33 @@ export default function METCampusHubFullPage() {
 
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setIsPostModalOpen(true)}
+              onClick={openPostModal}
               className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm px-4 py-2 rounded-lg transition shadow-sm"
             >
               <PlusCircle className="w-4 h-4" />
               <span>Post Item Free</span>
             </button>
-            <button
-              onClick={() => setAuthView("login")}
-              className="border border-slate-300 hover:bg-slate-100 text-slate-800 font-medium text-sm px-3.5 py-2 rounded-lg transition"
-            >
-              Log In / Register
-            </button>
+            {currentUser ? (
+              <div className="flex items-center gap-2">
+                <span className="hidden sm:inline-flex items-center gap-1.5 border border-emerald-200 bg-emerald-50 text-emerald-800 font-semibold text-xs px-3 py-2 rounded-lg">
+                  <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  {currentUser.name}
+                </span>
+                <button
+                  onClick={signOut}
+                  className="border border-slate-300 hover:bg-slate-100 text-slate-800 font-medium text-sm px-3.5 py-2 rounded-lg transition"
+                >
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setView("login")}
+                className="border border-slate-300 hover:bg-slate-100 text-slate-800 font-medium text-sm px-3.5 py-2 rounded-lg transition"
+              >
+                Log In / Register
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -816,57 +975,86 @@ export default function METCampusHubFullPage() {
       </section>
 
       {/* 6. AUTH SUITE MODALS */}
-      {authView !== "none" && (
+      {view !== "none" && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative border border-slate-200">
             <button
-              onClick={() => setAuthView("none")}
+              onClick={closeAuth}
               className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <div className="grid grid-cols-2 gap-1 bg-slate-100 rounded-lg p-1 mb-5">
-              <button
-                type="button"
-                onClick={() => setAuthView("login")}
-                className={`py-2 rounded-md text-sm font-semibold transition ${
-                  authView === "login" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                Log In
-              </button>
-              <button
-                type="button"
-                onClick={() => setAuthView("register")}
-                className={`py-2 rounded-md text-sm font-semibold transition ${
-                  authView === "register" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                Register
-              </button>
-            </div>
+            {view !== "forgot" && (
+              <div className="grid grid-cols-2 gap-1 bg-slate-100 rounded-lg p-1 mb-5">
+                <button
+                  type="button"
+                  onClick={() => setView("login")}
+                  className={`py-2 rounded-md text-sm font-semibold transition ${
+                    view === "login" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  Log In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setView("register")}
+                  className={`py-2 rounded-md text-sm font-semibold transition ${
+                    view === "register" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  Register
+                </button>
+              </div>
+            )}
 
-            {authView === "login" && (
+            {authWarning && (
+              <div className="mb-4 flex items-start gap-2 text-xs font-semibold text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
+                <Info className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                <span>{authWarning}</span>
+              </div>
+            )}
+
+            {view === "login" && (
               <div>
                 <h3 className="text-xl font-bold text-slate-900 mb-1">Welcome Back to MET Hub</h3>
                 <p className="text-xs text-slate-500 mb-4">Log in with your verified student account.</p>
 
-                <form onSubmit={(e) => { e.preventDefault(); showToast("Logged in successfully."); setAuthView("none"); }} className="space-y-3">
+                {loginError && (
+                  <div className="mb-3 text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+                    {loginError}
+                  </div>
+                )}
+
+                <form onSubmit={handleLoginSubmit} className="space-y-3">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Email or PRN Number</label>
-                    <input type="text" placeholder="student@met.edu or PRN Number" required className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
+                    <input
+                      type="text"
+                      placeholder="student@met.edu or PRN Number"
+                      required
+                      value={loginId}
+                      onChange={(e) => setLoginId(e.target.value)}
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Password</label>
-                    <input type="password" placeholder="••••••••" required className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
+                    <input
+                      type="password"
+                      placeholder="••••••••"
+                      required
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    />
                   </div>
 
                   <div className="flex items-center justify-between text-xs pt-1">
-                    <button type="button" onClick={() => setAuthView("forgot")} className="text-emerald-700 hover:underline font-semibold">
+                    <button type="button" onClick={() => { setLoginError(""); setForgotSent(false); setView("forgot"); }} className="text-emerald-700 hover:underline font-semibold">
                       Forgot Password?
                     </button>
-                    <button type="button" onClick={() => setAuthView("register")} className="text-slate-600 hover:underline">
+                    <button type="button" onClick={() => setView("register")} className="text-slate-600 hover:underline">
                       Need an account? Register
                     </button>
                   </div>
@@ -878,18 +1066,35 @@ export default function METCampusHubFullPage() {
               </div>
             )}
 
-            {authView === "register" && (
+            {view === "register" && (
               <div>
                 <h3 className="text-xl font-bold text-slate-900 mb-1">Create Student Account</h3>
                 <p className="text-xs text-slate-500 mb-4">Verify your details for MET BKC campus trading.</p>
 
-                <form onSubmit={(e) => { e.preventDefault(); showToast("Registration completed. OTP sent to your email/phone."); setAuthView("none"); }} className="space-y-3">
-                  <input type="text" placeholder="Full Name (e.g. Prathmesh Thorwat)" required className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-xs" />
+                {regError && (
+                  <div className="mb-3 text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+                    {regError}
+                  </div>
+                )}
+
+                <form onSubmit={handleRegisterSubmit} className="space-y-3">
+                  <input
+                    type="text"
+                    placeholder="Full Name (e.g. Prathmesh Thorwat)"
+                    required
+                    value={regName}
+                    onChange={(e) => setRegName(e.target.value)}
+                    className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-xs"
+                  />
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-[11px] font-semibold text-slate-600 mb-1">Branch</label>
-                      <select className="w-full border border-slate-300 rounded-lg p-2 text-xs">
+                      <select
+                        value={regBranch}
+                        onChange={(e) => setRegBranch(e.target.value)}
+                        className="w-full border border-slate-300 rounded-lg p-2 text-xs"
+                      >
                         {DEPARTMENTS.filter(d => d !== "All Branches").map(d => <option key={d}>{d}</option>)}
                       </select>
                     </div>
@@ -903,48 +1108,103 @@ export default function METCampusHubFullPage() {
 
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-600 mb-1">PRN Number</label>
-                    <input type="text" placeholder="e.g. 1234567890" required className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-xs" />
+                    <input
+                      type="text"
+                      placeholder="e.g. 1234567890"
+                      required
+                      value={regPrn}
+                      onChange={(e) => setRegPrn(e.target.value)}
+                      className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-xs"
+                    />
                   </div>
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-600 mb-1">Personal / College Email</label>
-                    <input type="email" placeholder="you@met.edu" required className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-xs" />
+                    <input
+                      type="email"
+                      placeholder="you@met.edu"
+                      required
+                      value={regEmail}
+                      onChange={(e) => setRegEmail(e.target.value)}
+                      className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-xs"
+                    />
                   </div>
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-600 mb-1">Phone / WhatsApp Number</label>
-                    <input type="tel" placeholder="+91 98765 43210" required className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-xs" />
+                    <input
+                      type="tel"
+                      placeholder="+91 98765 43210"
+                      required
+                      value={regPhone}
+                      onChange={(e) => setRegPhone(e.target.value)}
+                      className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-xs"
+                    />
                   </div>
-                  <input type="password" placeholder="Create Password" required className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-xs" />
+                  <input
+                    type="password"
+                    placeholder="Create Password"
+                    required
+                    value={regPassword}
+                    onChange={(e) => setRegPassword(e.target.value)}
+                    className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-xs"
+                  />
 
                   <div className="text-xs text-right pt-1">
-                    <button type="button" onClick={() => setAuthView("login")} className="text-emerald-700 hover:underline font-semibold">
+                    <button type="button" onClick={() => setView("login")} className="text-emerald-700 hover:underline font-semibold">
                       Already registered? Log In
                     </button>
                   </div>
 
                   <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">
-                    Register & Verify OTP
+                    Register &amp; Verify OTP
                   </button>
                 </form>
               </div>
             )}
 
-            {authView === "forgot" && (
+            {view === "forgot" && (
               <div>
                 <h3 className="text-xl font-bold text-slate-900 mb-1">Reset Password</h3>
                 <p className="text-xs text-slate-500 mb-4">Enter your PRN or registered email to receive a password reset link.</p>
 
-                <form onSubmit={(e) => { e.preventDefault(); showToast("Reset Link Sent"); setAuthView("login"); }} className="space-y-3">
-                  <input type="text" placeholder="PRN Number or Registered Email" required className="w-full px-3.5 py-2.5 border rounded-lg text-sm" />
-                  <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">
-                    Send Reset Link
-                  </button>
-                </form>
+                {forgotSent ? (
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-2 text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                      <span>
+                        Simulated: Password reset instructions sent to your registered PRN/Email. (Prototype mode)
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setForgotSent(false); setForgotInput(""); setView("login"); }}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-semibold transition"
+                    >
+                      Back to Sign In
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <form onSubmit={handleForgotSubmit} className="space-y-3">
+                      <input
+                        type="text"
+                        placeholder="PRN Number or Registered Email"
+                        required
+                        value={forgotInput}
+                        onChange={(e) => setForgotInput(e.target.value)}
+                        className="w-full px-3.5 py-2.5 border rounded-lg text-sm"
+                      />
+                      <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">
+                        Send Reset Link
+                      </button>
+                    </form>
 
-                <div className="text-xs text-center mt-3">
-                  <button type="button" onClick={() => setAuthView("login")} className="text-slate-600 hover:underline">
-                    Back to Login
-                  </button>
-                </div>
+                    <div className="text-xs text-center mt-3">
+                      <button type="button" onClick={() => setView("login")} className="text-slate-600 hover:underline">
+                        Back to Sign In
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
@@ -1164,13 +1424,13 @@ export default function METCampusHubFullPage() {
               <h3 className="text-lg">Report Listing</h3>
             </div>
             <p className="text-xs text-slate-500 mb-3">
-              Reporting item: <strong>&ldquo;{reportingItem.title}&rdquo;</strong>
+              Reporting: <strong>&ldquo;{reportingItem.title}&rdquo;</strong>
             </p>
 
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                showToast("Report submitted to MET Campus Moderation Team.");
+                showToast("Report submitted to MET Campus Safety Admin");
                 setReportingItem(null);
                 setReportReason("");
               }}
@@ -1178,19 +1438,29 @@ export default function METCampusHubFullPage() {
             >
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Reason for Report</label>
-                <select
-                  value={reportReason}
-                  onChange={(e) => setReportReason(e.target.value)}
-                  required
-                  className="w-full border border-slate-300 rounded-lg p-2.5 text-xs text-slate-800"
-                >
-                  <option value="">Select a reason...</option>
+                <div className="space-y-1.5">
                   {REPORT_REASONS.map((reason) => (
-                    <option key={reason} value={reason}>
-                      {reason}
-                    </option>
+                    <label
+                      key={reason}
+                      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border text-xs cursor-pointer transition ${
+                        reportReason === reason
+                          ? "border-rose-300 bg-rose-50 text-rose-900 font-semibold"
+                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="reportReason"
+                        value={reason}
+                        checked={reportReason === reason}
+                        onChange={(e) => setReportReason(e.target.value)}
+                        required
+                        className="accent-rose-600"
+                      />
+                      <span>{reason}</span>
+                    </label>
                   ))}
-                </select>
+                </div>
               </div>
 
               <div>
